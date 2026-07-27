@@ -1,0 +1,21 @@
+{
+  "name": "archwall-example-vite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Example app: ArchWall validating a layered TypeScript architecture in Vite dev and build.",
+  "//configLoader": "Only needed inside this monorepo: ArchWall is consumed as raw TypeScript source, which Vite's default config loader hands to Node. Against a published @archwall/vite the scripts are plain `vite` / `vite build`.",
+  "scripts": {
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@archwall/rules": "workspace:^",
+    "@archwall/vite": "workspace:^",
+    "archwall": "workspace:^",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.5"
+  }
+}

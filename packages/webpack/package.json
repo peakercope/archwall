@@ -1,0 +1,41 @@
+{
+  "name": "@archwall/webpack",
+  "version": "0.0.0",
+  "description": "webpack adapter for ArchWall: re-exports the shared Rspack/webpack plugin under a webpack-shaped name.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/webpack"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "dependencies": {
+    "@archwall/bundler-plugin": "workspace:^"
+  },
+  "peerDependencies": {
+    "webpack": "^5.0.0"
+  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

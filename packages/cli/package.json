@@ -1,0 +1,60 @@
+{
+  "name": "@archwall/cli",
+  "version": "0.0.0",
+  "description": "Standalone ArchWall CLI: builds the project graph with its own resolver and runs the same engine, no bundler required.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/cli"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "dependencies": {
+    "@archwall/core": "workspace:^",
+    "@archwall/integration-kit": "workspace:^",
+    "es-module-lexer": "^2.3.1",
+    "oxc-resolver": "^11.24.2",
+    "picomatch": "^4.0.5",
+    "tinyglobby": "^0.2.17"
+  },
+  "bin": {
+    "archwall": "./src/bin.ts"
+  },
+  "devDependencies": {
+    "@archwall/presets": "workspace:^",
+    "@archwall/rspack": "workspace:^",
+    "@archwall/vite": "workspace:^",
+    "@rspack/core": "^2.1.5",
+    "@swc/core": "^1.15.46",
+    "@types/picomatch": "^4.0.3",
+    "swc-loader": "^0.2.7",
+    "vite": "^8.1.5",
+    "webpack": "^5.109.1"
+  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    },
+    "bin": {
+      "archwall": "./dist/bin.mjs"
+    }
+  }
+}

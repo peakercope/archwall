@@ -1,0 +1,18 @@
+{
+  "name": "archwall-example-clean-node",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Example app: ArchWall validating a Clean Architecture Node service with the `layered` preset and the standalone CLI.",
+  "//check": "Against a published ArchWall this is just `archwall check`. Inside this monorepo the packages are raw TypeScript, so the run goes through the documented programmatic entry point with a TS-aware loader.",
+  "scripts": {
+    "check": "node --import jiti/register ./check.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@archwall/cli": "workspace:^",
+    "archwall": "workspace:^",
+    "jiti": "^2.7.0",
+    "typescript": "^6.0.3"
+  }
+}

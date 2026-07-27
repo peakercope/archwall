@@ -1,0 +1,38 @@
+{
+  "name": "@archwall/bundler-plugin",
+  "version": "0.0.0",
+  "description": "Shared ArchWall plugin for bundlers exposing webpack's compilation API (Rspack, webpack).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/bundler-plugin"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "dependencies": {
+    "@archwall/integration-kit": "workspace:^"
+  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

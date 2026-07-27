@@ -1,0 +1,57 @@
+{
+  "name": "@archwall/rspack",
+  "version": "0.0.0",
+  "description": "Rspack and webpack adapter for ArchWall: validates the real module graph at finishModules.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/rspack"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "dependencies": {
+    "@archwall/bundler-plugin": "workspace:^"
+  },
+  "peerDependencies": {
+    "@rspack/core": "^2.0.0",
+    "webpack": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@rspack/core": {
+      "optional": true
+    },
+    "webpack": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@archwall/presets": "workspace:^",
+    "@rspack/core": "^2.1.5",
+    "@swc/core": "^1.15.46",
+    "swc-loader": "^0.2.7",
+    "webpack": "^5.109.1"
+  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

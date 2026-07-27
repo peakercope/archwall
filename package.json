@@ -1,0 +1,31 @@
+{
+  "name": "archwall-monorepo",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git"
+  },
+  "type": "module",
+  "packageManager": "yarn@4.17.1",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "build:watch": "tsdown --watch",
+    "format": "biome check --write",
+    "test": "vitest run",
+    "verify:pack": "node scripts/verify-pack.mjs",
+    "typecheck": "yarn workspaces foreach -A --exclude archwall-monorepo exec tsc --noEmit"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "^0.18.5",
+    "@biomejs/biome": "^2.5.5",
+    "@types/node": "^24.13.3",
+    "publint": "^0.3.22",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

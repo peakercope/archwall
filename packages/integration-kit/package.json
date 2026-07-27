@@ -1,0 +1,44 @@
+{
+  "name": "@archwall/integration-kit",
+  "version": "0.0.0",
+  "description": "Adapter SDK for ArchWall integrations: GraphBuilder, run lifecycle, config loading, diagnostics, conformance harness.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/integration-kit"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "dependencies": {
+    "@archwall/core": "workspace:^",
+    "jiti": "^2.7.0"
+  },
+  "devDependencies": {
+    "@archwall/presets": "workspace:^",
+    "@archwall/test-utils": "workspace:^",
+    "react": "^19.2.8"
+  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

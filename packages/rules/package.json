@@ -1,0 +1,41 @@
+{
+  "name": "@archwall/rules",
+  "version": "0.0.0",
+  "description": "Built-in ArchWall rules: layer dependencies, forbidden dependencies, public API, deep imports, isolation, cycles, friend modules.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/rules"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.cjs",
+  "dependencies": {
+    "@archwall/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@archwall/test-utils": "workspace:^"
+  },
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

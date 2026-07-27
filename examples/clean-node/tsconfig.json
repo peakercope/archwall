@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "declaration": false,
+    "noEmit": true,
+    // ArchWall's CLI reads these `paths` to resolve `@/…` specifiers.
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "archwall.config.ts"]
+}

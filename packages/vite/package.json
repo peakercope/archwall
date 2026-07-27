@@ -1,0 +1,39 @@
+{
+  "name": "@archwall/vite",
+  "version": "0.0.0",
+  "description": "Vite adapter for ArchWall: validates the real module graph during dev and build.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/vite"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@archwall/integration-kit": "workspace:^"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"
+  },
+  "devDependencies": {
+    "@archwall/presets": "workspace:^",
+    "vite": "^8.1.5"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    }
+  }
+}
