@@ -49,9 +49,9 @@ function graph(
 const flagExternals = defineRule({
   meta: { name: "flag-externals", description: "", defaultSeverity: "error" },
   check(ctx) {
-    ctx.graph
-      .modules({ moduleKind: THIRD_PARTY_KINDS })
-      .forEach((m) => ctx.report({ module: m.id, message: `external: ${m.id}` }));
+    ctx.graph.modules({ moduleKind: THIRD_PARTY_KINDS }).forEach((m) => {
+      ctx.report({ module: m.id, message: `external: ${m.id}` });
+    });
   },
 });
 

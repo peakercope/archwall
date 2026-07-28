@@ -7,9 +7,9 @@ const banExternals = defineRule({
     defaultSeverity: "error",
   },
   check(ctx) {
-    ctx.graph
-      .modules({ moduleKind: THIRD_PARTY_KINDS })
-      .forEach((m) => ctx.report({ module: m.id, message: `external ${m.id} banned` }));
+    ctx.graph.modules({ moduleKind: THIRD_PARTY_KINDS }).forEach((m) => {
+      ctx.report({ module: m.id, message: `external ${m.id} banned` });
+    });
   },
 });
 

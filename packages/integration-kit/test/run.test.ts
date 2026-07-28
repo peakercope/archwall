@@ -76,9 +76,9 @@ describe("createArchWallRun", () => {
           defaultSeverity: "error",
         },
         check(ctx) {
-          ctx.graph
-            .modules({ moduleKind: "excluded" })
-            .forEach((m) => ctx.report({ module: m.id, message: `excluded ${m.id}` }));
+          ctx.graph.modules({ moduleKind: "excluded" }).forEach((m) => {
+            ctx.report({ module: m.id, message: `excluded ${m.id}` });
+          });
         },
       }),
     );

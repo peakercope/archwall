@@ -13,7 +13,9 @@ import { describe, expect, it } from "vitest";
 const flagModules = defineRule({
   meta: { name: "flag-modules", description: "", defaultSeverity: "error" },
   check(ctx) {
-    ctx.graph.modules().forEach((m) => ctx.report({ module: m.id, message: m.id }));
+    ctx.graph.modules().forEach((m) => {
+      ctx.report({ module: m.id, message: m.id });
+    });
   },
 });
 

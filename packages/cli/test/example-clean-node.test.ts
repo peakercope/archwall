@@ -23,9 +23,9 @@ describe("examples/clean-node", () => {
     const originals = files.map((f) => fs.readFileSync(f, "utf8"));
     try {
       // Un-comment the two seeded "Try it:" imports.
-      files.forEach((f, i) =>
-        fs.writeFileSync(f, originals[i]!.replace(/^\/\/ (import .+)$/gm, "$1")),
-      );
+      files.forEach((f, i) => {
+        fs.writeFileSync(f, originals[i]!.replace(/^\/\/ (import .+)$/gm, "$1"));
+      });
 
       const { result, failed } = await check({ cwd: exampleDir });
       expect(result.violations.map((v) => v.ruleId).sort()).toEqual([
@@ -34,7 +34,9 @@ describe("examples/clean-node", () => {
       ]);
       expect(failed).toBe(true);
     } finally {
-      files.forEach((f, i) => fs.writeFileSync(f, originals[i]!));
+      files.forEach((f, i) => {
+        fs.writeFileSync(f, originals[i]!);
+      });
     }
   }, 60_000);
 });

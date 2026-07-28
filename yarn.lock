@@ -86,6 +86,7 @@ __metadata:
     "@rollup/plugin-typescript": "npm:^12.3.0"
     rollup: "npm:^4.62.3"
     tslib: "npm:^2.8.1"
+    typescript: "npm:^6.0.3"
   peerDependencies:
     rollup: ^4.0.0
   peerDependenciesMeta:

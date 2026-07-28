@@ -8,7 +8,9 @@ const flagCross = defineRule({
     ctx.graph
       .modules({ tag: { layer: "a" } })
       .edgesOut({ toTag: { layer: "b" } })
-      .forEach((edge) => ctx.report({ edge, message: "a->b" }));
+      .forEach((edge) => {
+        ctx.report({ edge, message: "a->b" });
+      });
   },
 });
 
