@@ -2,12 +2,16 @@ import * as path from "node:path";
 import { check } from "@archwall/cli";
 import type { ConfiguredRule, UserConfig } from "@archwall/core";
 import { configureRule, defineRule } from "@archwall/core";
+import archwallEsbuild from "@archwall/esbuild";
 import type { GraphSnapshot } from "@archwall/integration-kit";
 import { assertGraphsMatch, graphSnapshot } from "@archwall/integration-kit";
+import archwallRollup from "@archwall/rollup";
 import ArchWallPlugin from "@archwall/rspack";
 import archwallVite from "@archwall/vite";
 import { build } from "vite";
 import { describe, expect, it } from "vitest";
+import { buildWithEsbuild } from "../../esbuild/test/builds.js";
+import { buildWithRollup } from "../../rollup/test/builds.js";
 import { buildWithRspack, buildWithWebpack } from "../../rspack/test/bundlers.js";
 
 /**
@@ -49,8 +53,10 @@ function configWith(rule: ConfiguredRule<Record<string, never>>): UserConfig {
   return { sourceRoot: "src", rules: [rule], failOn: "never", reporters: [] };
 }
 
-async function graphs(): Promise<Record<"vite" | "rspack" | "webpack" | "cli", GraphSnapshot>> {
-  const out = {} as Record<"vite" | "rspack" | "webpack" | "cli", GraphSnapshot>;
+type Producer = "vite" | "rollup" | "esbuild" | "rspack" | "webpack" | "cli";
+
+async function graphs(): Promise<Record<Producer, GraphSnapshot>> {
+  const out = {} as Record<Producer, GraphSnapshot>;
 
   const vite: { snapshot?: GraphSnapshot } = {};
   await build({
@@ -68,6 +74,19 @@ async function graphs(): Promise<Record<"vite" | "rspack" | "webpack" | "cli", G
     },
   });
   out.vite = vite.snapshot!;
+
+  const rollup: { snapshot?: GraphSnapshot } = {};
+  await buildWithRollup(
+    archwallRollup({ config: configWith(snapshotProbe(rollup)), cwd: () => FIXTURE }),
+    { where: { dir: FIXTURE, src: SRC } },
+  );
+  out.rollup = rollup.snapshot!;
+
+  const esbuild: { snapshot?: GraphSnapshot } = {};
+  await buildWithEsbuild(archwallEsbuild({ config: configWith(snapshotProbe(esbuild)) }), {
+    where: { dir: FIXTURE, src: SRC },
+  });
+  out.esbuild = esbuild.snapshot!;
 
   const rspack: { snapshot?: GraphSnapshot } = {};
   await buildWithRspack(new ArchWallPlugin({ config: configWith(snapshotProbe(rspack)) }), {
@@ -92,10 +111,11 @@ async function graphs(): Promise<Record<"vite" | "rspack" | "webpack" | "cli", G
 
 describe("IR conformance across producers", () => {
   it("builds the same normalized graph under every producer", async () => {
-    const { vite, rspack, webpack, cli } = await graphs();
+    const all = await graphs();
+    const { vite } = all;
 
-    // Every first-party file must be present and `source` under all four.
-    for (const [host, snap] of Object.entries({ vite, rspack, webpack, cli })) {
+    // Every first-party file must be present and `source` under all six.
+    for (const [host, snap] of Object.entries(all)) {
       for (const file of [
         "main.ts",
         "feature/index.ts",
@@ -110,10 +130,10 @@ describe("IR conformance across producers", () => {
       expect(snap.modules["node:path"], `${host} mislabelled node:path`).toBe("builtin");
     }
 
-    assertGraphsMatch(rspack, vite, "rspack vs vite");
-    assertGraphsMatch(webpack, vite, "webpack vs vite");
-    assertGraphsMatch(cli, vite, "cli vs vite");
-  }, 240_000);
+    for (const host of ["rollup", "esbuild", "rspack", "webpack", "cli"] as const) {
+      assertGraphsMatch(all[host], vite, `${host} vs vite`);
+    }
+  }, 360_000);
 
   it("resolves an alias through a barrel to the real file, on every producer", async () => {
     // `main.ts` imports "@/feature" (tsconfig path alias); `feature/index.ts` imports
@@ -123,12 +143,12 @@ describe("IR conformance across producers", () => {
     for (const [host, snap] of Object.entries(all)) {
       expect(snap.edges, `${host}`).toContain("main.ts -> feature/index.ts (static)");
       expect(snap.edges, `${host}`).toContain("feature/index.ts -> shared/index.ts (static)");
-      // Coarse edge kind: `reexport-edges` is a declared capability and Vite/Rollup
-      // genuinely cannot distinguish a re-export, so the barrel edge is compared as
-      // `static` rather than failing an adapter for honestly declaring its limits.
+      // Coarse edge kind: `reexport-edges` is a declared capability and Vite/Rollup and
+      // esbuild genuinely cannot distinguish a re-export, so the barrel edge is compared
+      // as `static` rather than failing an adapter for honestly declaring its limits.
       expect(snap.edges, `${host}`).toContain("shared/index.ts -> shared/util.ts (static)");
     }
-  }, 240_000);
+  }, 360_000);
 
   it("marks a dynamic import dynamic, on every producer", async () => {
     // Mislabelling this as static changes results: `no-cycles` treats a dynamic edge as a
@@ -138,7 +158,7 @@ describe("IR conformance across producers", () => {
     for (const [host, snap] of Object.entries(all)) {
       expect(snap.edges, `${host}`).toContain("feature/index.ts -> feature/lazy.ts (dynamic)");
     }
-  }, 240_000);
+  }, 360_000);
 
   it("distinguishes a re-export where the host declares `reexport-edges`", async () => {
     // The coarse comparison above must not hide the fact that capable hosts DO report it.

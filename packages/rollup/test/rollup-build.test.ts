@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import type { Reporter, UserConfig, Violation } from "@archwall/core";
+import type { Reporter, UserConfig, Violation } from "@archwall/integration-kit";
 import { assertViolationsMatch, FSD_APP_EXPECTED } from "@archwall/integration-kit";
 import { fsd } from "@archwall/presets";
 import archwallRollup from "@archwall/rollup";

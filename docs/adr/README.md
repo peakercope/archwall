@@ -36,3 +36,4 @@ never edit history into agreement with the present.
 | [0008](0008-rollup-adapter-extraction.md) | Rollup is its own adapter package |
 | [0009](0009-one-project-boundary-pipeline.md) | One pipeline: boundary → transforms → boundary → classify |
 | [0010](0010-module-kind-not-external-boolean.md) | Seven module kinds instead of `external: boolean` |
+| [0011](0011-esbuild-metafile-adapter.md) | The esbuild adapter reads the metafile |

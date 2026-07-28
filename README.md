@@ -3,7 +3,7 @@
 ArchWall validates the *actual dependency graph produced during compilation* — after aliases, barrel files, tsconfig path mappings, and module resolution have been applied — instead of guessing from source text the way ESLint-based approaches must.
 
 - **Accurate**: rules run on the compiled module graph, so barrels and aliases can't hide a violation.
-- **Bundler-agnostic**: a pure core engine fed by thin adapters — Rollup, Vite, Rspack, and webpack today, plus a standalone CLI for CI; an esbuild adapter slots in without core changes.
+- **Bundler-agnostic**: a pure core engine fed by thin adapters — Rollup, Vite, esbuild, Rspack, and webpack, plus a standalone CLI for CI. All six build the same IR, and a shared conformance suite proves it.
 - **Style-agnostic**: Feature-Sliced Design, layered architecture, Clean Architecture, or your own rules — all are presets over the same engine. Core knows tags and graph shapes, never styles.
 - **Extensible**: custom rules, classifiers, presets, reporters, and adapters are plain objects passed through config; built-ins use the same public API.
 
@@ -106,6 +106,12 @@ export default { plugins: [archwall(), /* resolvers… */] };
 ```
 
 ```ts
+// build.mjs — esbuild reads its graph from the metafile, so plugin order does not matter
+import archwall from "@archwall/esbuild";
+await esbuild.build({ bundle: true, plugins: [archwall()], /* … */ });
+```
+
+```ts
 // rspack.config.ts — identical for webpack.config.ts via @archwall/webpack
 import ArchWallPlugin from "@archwall/rspack";
 export default { plugins: [new ArchWallPlugin()] };
@@ -127,6 +133,8 @@ In Vite build mode the full graph is validated at `buildEnd` and can fail the bu
 
 Rspack and webpack validate at `finishModules`, which always sees the complete graph — including on watch rebuilds — so there is no progressive mode there and no dev/build split. Violations land on `compilation.errors` or `compilation.warnings` per `failOn`.
 
+esbuild has no module-graph hook, so its adapter validates at `onEnd` from the build's **metafile** — which it turns on for you. Two consequences follow from that being the only surface. Plugin order is irrelevant, because the metafile records what you wrote whoever resolved it, so specifier rules work wherever the plugin sits. And `bundle: true` is required for whole-graph rules: without it esbuild never follows an import, so ArchWall declines `complete-graph` and those rules skip loudly rather than reporting a clean project. Violations become esbuild errors or warnings per `failOn`. See [ADR 0011](docs/adr/0011-esbuild-metafile-adapter.md).
+
 ## Packages
 
 | Package | Role |
@@ -137,6 +145,7 @@ Rspack and webpack validate at `finishModules`, which always sees the complete g
 | [`@archwall/integration-kit`](packages/integration-kit) | Adapter SDK: `GraphBuilder`, `createArchWallRun`, config loading, conformance helpers |
 | [`@archwall/rollup`](packages/rollup) | Rollup adapter, and the shared implementation for every Rollup-shaped host |
 | [`@archwall/vite`](packages/vite) | `@archwall/rollup` in build, plus progressive dev-mode analysis |
+| [`@archwall/esbuild`](packages/esbuild) | esbuild adapter, reading the graph from the build's metafile |
 | [`@archwall/bundler-plugin`](packages/bundler-plugin) | Shared plugin for bundlers exposing webpack's compilation API |
 | [`@archwall/rspack`](packages/rspack) | Rspack-shaped surface over `@archwall/bundler-plugin` |
 | [`@archwall/webpack`](packages/webpack) | webpack-shaped surface over `@archwall/bundler-plugin` |
