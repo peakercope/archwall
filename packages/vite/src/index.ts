@@ -1,15 +1,6 @@
-import type {
-  ArchWallRun,
-  Capability,
-  GraphTransform,
-  UserConfig,
-} from "@archwall/integration-kit";
-import {
-  createArchWallRun,
-  createModuleKindResolver,
-  dropSelfEdges,
-  formatViolation,
-} from "@archwall/integration-kit";
+import type { ArchWallRun, UserConfig } from "@archwall/integration-kit";
+import { createArchWallRun, dropSelfEdges, formatViolation } from "@archwall/integration-kit";
+import { archwallRollup } from "@archwall/rollup";
 import type { Plugin, ViteDevServer } from "vite";
 import { version as viteVersion } from "vite";
 import { addDevModules } from "./dev-graph.js";
@@ -17,43 +8,62 @@ import { addDevModules } from "./dev-graph.js";
 export type { DevModuleLike } from "./dev-graph.js";
 export { addDevModules } from "./dev-graph.js";
 
+/**
+ * ArchWall for Vite.
+ *
+ * Build mode IS the Rollup adapter — Vite's build is Rollup, and every hook the build path
+ * needs (`resolveId`, `buildEnd`, `getModuleIds`, `getModuleInfo`) is Rollup's. So this
+ * package contributes exactly one thing on top of `@archwall/rollup`: dev mode, which is
+ * the only genuinely Vite-shaped part.
+ *
+ * **Build is the source of truth; dev mode is fast feedback.** Dev runs progressively over
+ * the loaded subgraph, reports to the console, and never fails the dev server.
+ */
 export default function archwall(options: { config?: string | UserConfig } = {}): Plugin {
   let isBuild = false;
   let root = process.cwd();
-  let devRun: ArchWallRun | undefined;
+  let devRun: Promise<ArchWallRun> | undefined;
   let devServer: ViteDevServer | undefined;
   let devTimer: ReturnType<typeof setTimeout> | undefined;
-  const rawSpecifiers = new Map<string, string>();
 
-  const makeRun = (capabilities: Capability[], transforms?: GraphTransform[]) =>
-    createArchWallRun({
-      host: {
-        name: "vite",
-        version: viteVersion,
-        capabilities: new Set(capabilities),
-      },
-      cwd: root,
-      ...(transforms !== undefined ? { transforms } : {}),
-      ...(typeof options.config === "string" ? { configPath: options.config } : {}),
-      ...(typeof options.config === "object" ? { config: options.config } : {}),
-    });
+  const build = archwallRollup({
+    ...(options.config !== undefined ? { config: options.config } : {}),
+    host: { name: "vite", version: viteVersion },
+    cwd: () => root,
+    // The Rollup hooks are inert until Vite says this is a build; dev has its own path.
+    enabled: () => isBuild,
+  });
 
-  const scheduleDevAnalysis = () => {
+  const scheduleDevAnalysis = (): void => {
     if (!devServer) return;
     clearTimeout(devTimer);
     devTimer = setTimeout(async () => {
       const server = devServer;
       if (!server) return;
       try {
-        // Dev deliberately declares NO `raw-specifiers`: the dev module graph does not
-        // carry what the author wrote, and a rule that matches on specifiers must skip
-        // loudly here rather than quietly matching nothing.
-        // HMR instrumentation invents self-edges; the policy for dropping them is shared
-        // code this host opts into, not something the adapter reimplements.
-        devRun ??= await makeRun(["dynamic-imports"], [dropSelfEdges()]);
-        const builder = devRun.graphBuilder("progressive");
+        // Assigned before the first `await`, so two overlapping timers cannot each build a
+        // run: the promise itself is the memo.
+        devRun ??= createArchWallRun({
+          host: {
+            name: "vite",
+            version: viteVersion,
+            // Dev declares NO `raw-specifiers`: the dev module graph does not carry what
+            // the author wrote, so a rule that matches on specifiers must skip loudly here
+            // rather than quietly matching nothing. Nor `complete-graph` — only the modules
+            // the browser has asked for are loaded.
+            capabilities: new Set(["dynamic-imports"]),
+          },
+          cwd: root,
+          // HMR instrumentation invents self-edges; the policy for dropping them is shared
+          // code this host opts into, not something the adapter reimplements.
+          transforms: [dropSelfEdges()],
+          ...(typeof options.config === "string" ? { configPath: options.config } : {}),
+          ...(typeof options.config === "object" ? { config: options.config } : {}),
+        });
+        const run = await devRun;
+        const builder = run.graphBuilder("progressive");
         addDevModules(builder, server.moduleGraph.idToModuleMap.values());
-        const { result } = await devRun.analyze(builder.build());
+        const { result } = await run.analyze(builder.build());
         for (const v of result.violations)
           server.config.logger.warn(formatViolation(v, result.repoRoot));
       } catch (err) {
@@ -76,63 +86,7 @@ export default function archwall(options: { config?: string | UserConfig } = {})
       if (!isBuild) scheduleDevAnalysis();
       return null;
     },
-    async resolveId(source, importer) {
-      // Passive: record what the author wrote per resolved target, never influence resolution.
-      if (!isBuild || !importer) return null;
-      const resolved = await this.resolve(source, importer, { skipSelf: true });
-      if (resolved) rawSpecifiers.set(`${importer} ${resolved.id}`, source);
-      return null;
-    },
-    async buildEnd() {
-      if (!isBuild) return;
-      // Build mode records the author's specifier in `resolveId`, so it can claim
-      // `raw-specifiers`; dev mode above deliberately cannot.
-      const run = await makeRun(["complete-graph", "dynamic-imports", "raw-specifiers"]);
-      const builder = run.graphBuilder("complete");
-      const kinds = createModuleKindResolver({
-        sourceRoot: run.config.sourceRoot,
-      });
-      for (const id of this.getModuleIds()) {
-        const info = this.getModuleInfo(id);
-        if (!info) continue;
-        const file = id.startsWith("\0") ? null : (id.split("?")[0] ?? id);
-        builder.addModule({
-          id,
-          file,
-          // Facts only: the id, the file, and Rollup's own externality verdict where it
-          // still exists. What those add up to is not this adapter's decision.
-          ...kinds.infer({
-            id,
-            file,
-            isExternal: (info as { isExternal?: boolean }).isExternal,
-          }),
-        });
-        for (const to of info.importedIds) {
-          builder.addEdge({
-            from: id,
-            to,
-            rawSpecifier: rawSpecifiers.get(`${id} ${to}`) ?? to,
-            resolvedPath: to,
-            kind: "static",
-          });
-        }
-        for (const to of info.dynamicallyImportedIds) {
-          builder.addEdge({
-            from: id,
-            to,
-            rawSpecifier: rawSpecifiers.get(`${id} ${to}`) ?? to,
-            resolvedPath: to,
-            kind: "dynamic",
-          });
-        }
-      }
-      const { failed, summary, result } = await run.analyze(builder.build());
-      // The map is per-build; keeping it would leak across watch rebuilds.
-      rawSpecifiers.clear();
-      if (result.violations.length === 0) return;
-      const detail = result.violations.map((v) => formatViolation(v, result.repoRoot)).join("\n");
-      if (failed) this.error(`${summary}\n${detail}`);
-      else this.warn(`${summary}\n${detail}`);
-    },
-  };
+    resolveId: build.resolveId,
+    buildEnd: build.buildEnd,
+  } as Plugin;
 }

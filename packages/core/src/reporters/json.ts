@@ -1,43 +1,60 @@
-import type { Reporter } from "../contracts/reporter.js";
+import type { OutputSink, Reporter } from "../contracts/reporter.js";
 import { toRelative } from "../paths.js";
-import type { Violation } from "../violations.js";
-import { defaultIO, type ReporterIO } from "./console.js";
+import type { Violation, ViolationLocation } from "../violations.js";
+
+function serializeLocation(repoRoot: string, l: ViolationLocation): Record<string, unknown> {
+  switch (l.type) {
+    case "edge":
+      return {
+        type: "edge",
+        edge: {
+          ...l.edge,
+          from: toRelative(repoRoot, l.edge.from),
+          to: toRelative(repoRoot, l.edge.to),
+          resolvedPath: toRelative(repoRoot, l.edge.resolvedPath),
+          ...(l.edge.loc !== undefined
+            ? { loc: { ...l.edge.loc, file: toRelative(repoRoot, l.edge.loc.file) } }
+            : {}),
+        },
+      };
+    case "module":
+      return { type: "module", module: toRelative(repoRoot, l.module) };
+    case "path":
+      return {
+        type: "path",
+        path: toRelative(repoRoot, l.path),
+        ...(l.loc !== undefined
+          ? { loc: { ...l.loc, file: toRelative(repoRoot, l.loc.file) } }
+          : {}),
+      };
+  }
+}
 
 /** Paths are repository-relative so the document is identical on every machine. */
 function serialize(repoRoot: string, v: Violation): Record<string, unknown> {
   return {
-    ...v,
-    ...(v.module !== undefined ? { module: toRelative(repoRoot, v.module) } : {}),
-    ...(v.edge !== undefined
-      ? {
-          edge: {
-            ...v.edge,
-            from: toRelative(repoRoot, v.edge.from),
-            to: toRelative(repoRoot, v.edge.to),
-            resolvedPath: toRelative(repoRoot, v.edge.resolvedPath),
-            ...(v.edge.loc !== undefined
-              ? {
-                  loc: {
-                    ...v.edge.loc,
-                    file: toRelative(repoRoot, v.edge.loc.file),
-                  },
-                }
-              : {}),
-          },
-        }
-      : {}),
+    ruleName: v.ruleName,
+    ruleId: v.ruleId,
+    severity: v.severity,
+    message: v.message,
+    ...(v.messageId !== undefined ? { messageId: v.messageId } : {}),
+    ...(v.data !== undefined ? { data: v.data } : {}),
+    locations: v.locations.map((l) => serializeLocation(repoRoot, l)),
+    ...(v.explanation !== undefined ? { explanation: v.explanation } : {}),
+    fingerprint: v.fingerprint,
   };
 }
 
-export function jsonReporter(io: ReporterIO = defaultIO): Reporter {
+export function jsonReporter(sink: OutputSink): Reporter {
   return {
     name: "json",
     onRunEnd(result) {
-      io.write(
+      sink.write(
         JSON.stringify(
           {
             violations: result.violations.map((v) => serialize(result.repoRoot, v)),
             diagnostics: result.diagnostics,
+            rules: result.rules,
             stats: result.stats,
             host: {
               name: result.host.name,

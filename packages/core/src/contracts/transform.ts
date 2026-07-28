@@ -1,22 +1,22 @@
-import type { Capability, ProjectGraph } from "../graph/ir.js";
+import type { Capability, GraphMutation } from "../graph/ir.js";
 
 export interface TransformContext {
   /** Absolute source root from resolved config. */
   sourceRoot: string;
   /** Absolute repository root from resolved config. */
   repoRoot: string;
+  /** A file's path relative to {@link sourceRoot}, or null when it lies outside. */
+  relative(file: string): string | null;
 }
 
 /**
- * A pass that may ADD to the graph, between the project boundary and classification.
+ * A pass that enriches the graph, between the project boundary and classification.
  *
- * The pipeline used to be `boundary → classify → check`, with no slot for a third party —
- * or for the project's own planned TypeScript type-edge enricher — to contribute edges or
- * module metadata. "An additive capability, not an IR redesign" is only true if there is
- * somewhere to add it, and there wasn't.
- *
- * Ordered after the boundary so a transform sees which modules are actually in the project,
- * and before classification so anything it adds gets tagged like everything else.
+ * The slot a TypeScript type-edge enricher — or any other "add facts the bundler did not
+ * give us" pass — lives in. Ordered after the boundary so a transform sees which modules
+ * are actually in the project, and before classification so anything it adds gets tagged
+ * like everything else. Modules a transform adds are boundary-checked too: the pipeline
+ * runs the boundary again over its contributions rather than trusting them.
  *
  * A transform may also declare capabilities it CONTRIBUTES. A rule requiring `type-edges`
  * should run when a transform supplies them, even though no host does — which is the whole
@@ -30,12 +30,18 @@ export interface GraphTransform {
    */
   provides?: Capability[];
   /**
-   * Pure: return a NEW graph rather than mutating the input. A transform that throws is
-   * isolated the same way a rule is — it is reported as a diagnostic and the pipeline
-   * continues with the untransformed graph, because one broken enricher must not destroy
-   * the whole run.
+   * Writes through {@link GraphMutation} rather than returning a new graph.
+   *
+   * Graph-in/graph-out meant every third-party transform in existence saw and
+   * reconstructed the concrete representation, which froze it — and invited the whole
+   * class of bug where a transform rebuilds a graph and silently drops a field it did not
+   * know about. See docs/adr/0002-opaque-project-graph.md.
+   *
+   * A transform that throws is isolated the same way a rule is: reported as a diagnostic,
+   * its partial writes discarded, and the pipeline continues — one broken enricher must
+   * not destroy the whole run.
    */
-  transform(graph: ProjectGraph, ctx: TransformContext): ProjectGraph;
+  transform(graph: GraphMutation, ctx: TransformContext): void;
 }
 
 export function defineTransform(transform: GraphTransform): GraphTransform {

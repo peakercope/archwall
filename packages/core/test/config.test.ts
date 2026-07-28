@@ -101,7 +101,12 @@ describe("rule instance ids", () => {
       classifiers: [],
       rules: [configureRule(ruleA, { x: 42 })],
     };
-    expect(() => resolveConfig({ presets: [preset, twin] })).toThrow(/both named "p"/);
+    // Reported, not thrown: a name collision costs you the collision, not the whole run.
+    // The later preset is namespaced apart so the outcome is stated rather than merged.
+    const r = resolveConfig({ presets: [preset, twin] });
+    expect(r.diagnostics.map((d) => d.code)).toContain("invalid-config");
+    expect(r.diagnostics[0]!.message).toMatch(/both named "p"/);
+    expect(r.rules.map((x) => x.id).sort()).toEqual(["p#2/a", "p/a", "p/b"]);
   });
 
   it("replaces array options wholesale rather than concatenating them", () => {
@@ -131,12 +136,15 @@ describe("rule instance ids", () => {
   });
 
   it("rejects a bare user rule when two presets make it ambiguous", () => {
-    expect(() =>
-      resolveConfig({
-        presets: [preset, other],
-        rules: [configureRule(ruleA, { x: 5 })],
-      }),
-    ).toThrow(/configured by more than one preset/);
+    const r = resolveConfig({
+      presets: [preset, other],
+      rules: [configureRule(ruleA, { x: 5 })],
+    });
+    // The ambiguous entry is dropped and said so; every unambiguous rule still runs.
+    expect(r.diagnostics.map((d) => d.message).join()).toMatch(
+      /configured by more than one preset/,
+    );
+    expect(r.rules.map((x) => x.id)).toContain("p/a");
   });
 
   it("honours an explicit id, allowing two instances of one rule", () => {
@@ -196,9 +204,13 @@ describe("overrides", () => {
     expect(a.severity).toBe("error");
   });
 
-  it("throws on a key that matches no rule, listing what exists", () => {
-    expect(() => resolveConfig({ presets: [preset], overrides: { "p/no-cycels": "off" } })).toThrow(
-      /matches no configured rule.*p\/a, p\/b/s,
-    );
+  it("reports a key that matches no rule, listing what exists", () => {
+    // A typo'd override key is a real mistake and must not pass silently — but it is also
+    // not a reason to destroy the other thirty-nine rules' results, which is what throwing
+    // from inside a bundler's buildEnd did.
+    const r = resolveConfig({ presets: [preset], overrides: { "p/no-cycels": "off" } });
+    const problem = r.diagnostics.find((d) => d.code === "invalid-config");
+    expect(problem?.message).toMatch(/matches no configured rule.*p\/a, p\/b/s);
+    expect(r.rules.map((x) => x.id).sort()).toEqual(["p/a", "p/b"]);
   });
 });

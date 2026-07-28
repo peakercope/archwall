@@ -1,5 +1,6 @@
 import * as path from "node:path";
-import type { ModuleKind, ProjectGraph, Violation } from "@archwall/core";
+import type { Edge, ModuleKind, ModuleNode, Violation } from "@archwall/core";
+import { primaryEdge, primaryModule } from "@archwall/core";
 import { packageNameFromPath } from "./module-path.js";
 
 /** Paths root-relative, forward slashes. */
@@ -120,8 +121,20 @@ export interface GraphSnapshotOptions {
   edgeKinds?: "exact" | "coarse";
 }
 
+/**
+ * Anything a snapshot can be taken of: a `ProjectGraph`, or the `GraphQuery` a rule holds.
+ *
+ * Structural on purpose. An adapter author verifying conformance from inside a probe rule
+ * has a query, not a graph, and requiring a `ProjectGraph` forced them to reconstruct one
+ * by hand — which meant hand-writing the very representation the IR keeps private.
+ */
+export interface ReadableGraph {
+  modules(): Iterable<ModuleNode>;
+  edges(): readonly Edge[];
+}
+
 export function graphSnapshot(
-  graph: ProjectGraph,
+  graph: ReadableGraph,
   root: string,
   opts: GraphSnapshotOptions = {},
 ): GraphSnapshot {
@@ -136,17 +149,18 @@ export function graphSnapshot(
   // would fail a correct adapter for a detail that says nothing about the user's
   // architecture. What must agree is the shape of the code the user wrote.
   const virtual = new Set<string>();
-  for (const m of graph.modules.values()) if (m.kind === "virtual") virtual.add(m.id);
+  for (const m of graph.modules()) if (m.kind === "virtual") virtual.add(m.id);
 
   const modules: Record<string, ModuleKind> = {};
-  for (const m of graph.modules.values()) {
+  for (const m of graph.modules()) {
     if (m.kind === "virtual") continue;
     modules[name(m.file ?? m.id)] = m.kind;
   }
 
   return {
     modules: Object.fromEntries(Object.entries(modules).sort(([a], [b]) => a.localeCompare(b))),
-    edges: graph.edges
+    edges: graph
+      .edges()
       .filter((e) => !virtual.has(e.from) && !virtual.has(e.to))
       .map((e) => `${name(e.from)} -> ${name(e.to)} (${kindOf(e.kind)})`)
       .sort(),
@@ -190,7 +204,10 @@ export function assertViolationsMatch(
   expected: ExpectedViolationAt[],
 ): void {
   const actual = violations
-    .map((v) => key(v.ruleName, rel(root, v.edge?.from ?? v.module), rel(root, v.edge?.to)))
+    .map((v) => {
+      const edge = primaryEdge(v);
+      return key(v.ruleName, rel(root, edge?.from ?? primaryModule(v)), rel(root, edge?.to));
+    })
     .sort();
   const wanted = expected.map((e) => key(e.rule, e.from, e.to)).sort();
   if (actual.length === wanted.length && actual.every((a, i) => a === wanted[i])) return;

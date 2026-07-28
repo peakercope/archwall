@@ -1,11 +1,9 @@
 # ArchWall
 
-**Bundler-agnostic architecture validation for JavaScript and TypeScript.**
-
 ArchWall validates the *actual dependency graph produced during compilation* — after aliases, barrel files, tsconfig path mappings, and module resolution have been applied — instead of guessing from source text the way ESLint-based approaches must.
 
 - **Accurate**: rules run on the compiled module graph, so barrels and aliases can't hide a violation.
-- **Bundler-agnostic**: a pure core engine fed by thin adapters — Vite, Rspack, and webpack today, plus a standalone CLI for CI; Rollup and esbuild adapters slot in without core changes.
+- **Bundler-agnostic**: a pure core engine fed by thin adapters — Rollup, Vite, Rspack, and webpack today, plus a standalone CLI for CI; an esbuild adapter slots in without core changes.
 - **Style-agnostic**: Feature-Sliced Design, layered architecture, Clean Architecture, or your own rules — all are presets over the same engine. Core knows tags and graph shapes, never styles.
 - **Extensible**: custom rules, classifiers, presets, reporters, and adapters are plain objects passed through config; built-ins use the same public API.
 
@@ -30,8 +28,8 @@ yarn workspace archwall-example-clean-node check
 
 ## Quick start
 
-Pick a preset and you are done. `archwall.config.ts` is honored identically by the Vite plugin, the
-Rspack/webpack plugin, and the CLI:
+Pick a preset and you are done. `archwall.config.ts` is honored identically by the Rollup/Vite
+plugin, the Rspack/webpack plugin, and the CLI:
 
 ```ts
 // archwall.config.ts
@@ -40,6 +38,17 @@ import { defineConfig, fsd } from "archwall";
 export default defineConfig({
   sourceRoot: "./src",
   presets: [fsd()],
+});
+```
+
+Configurations compose with `extends`, and presets, rules, and reporters can be named rather
+than imported — which is what makes an organisation-wide config a package rather than twenty
+lines to copy into every repository:
+
+```ts
+export default defineConfig({
+  extends: "@acme/archwall-config",
+  presets: [["@acme/archwall-preset-platform", { strict: true }]],
 });
 ```
 
@@ -82,13 +91,18 @@ right for both:
 
 `include` and `exclude` are matched **relative to `sourceRoot`** — with `sourceRoot: "./src"`,
 the pattern for `src/features` is `features/**`. They are applied by the engine to the module
-graph, so the Vite plugin, the Rspack/webpack plugin, and the CLI all resolve the same project
-boundary from the same config.
+graph, so every adapter and the CLI resolve the same project boundary from the same config.
 
 ```ts
 // vite.config.ts
 import archwall from "@archwall/vite";
 export default { plugins: [archwall()] };
+```
+
+```ts
+// rollup.config.ts — put it FIRST, so it can observe the specifiers you actually wrote
+import archwall from "@archwall/rollup";
+export default { plugins: [archwall(), /* resolvers… */] };
 ```
 
 ```ts
@@ -99,8 +113,15 @@ export default { plugins: [new ArchWallPlugin()] };
 
 ```sh
 # or standalone, no bundler required
-archwall check [--config path] [--reporter console|json|sarif] [--fail-on error|warn|never]
+archwall check [--config path] [--reporter <name>] [--output <dest>] [--fail-on error|warn|never]
+
+# `--reporter` and `--output` pair up positionally, so machine-readable output
+# gets its own file and stdout is never contaminated by the human summary:
+archwall check --reporter console --reporter sarif --output archwall.sarif
 ```
+
+The summary line always goes to **stderr**, so `--reporter json > out.json` produces a file
+that is valid JSON.
 
 In Vite build mode the full graph is validated at `buildEnd` and can fail the build per `failOn`. In dev mode ArchWall runs progressively over the loaded subgraph, reports to the console, and never fails the dev server. **Build/CLI is the source of truth; dev mode is fast feedback.**
 
@@ -114,13 +135,44 @@ Rspack and webpack validate at `finishModules`, which always sees the complete g
 | [`@archwall/rules`](packages/rules) | Built-in rules ([**docs**](docs/rules/index.md)): `layer-dependencies`, `forbidden-dependencies`, `public-api`, `no-deep-imports`, `feature-isolation`, `no-cycles`, `friend-modules`, `require-tag` |
 | [`@archwall/presets`](packages/presets) | Built-in architecture presets: `fsd()`, `layered()`, `modules()` |
 | [`@archwall/integration-kit`](packages/integration-kit) | Adapter SDK: `GraphBuilder`, `createArchWallRun`, config loading, conformance helpers |
-| [`@archwall/vite`](packages/vite) | Vite adapter (complete graph in build, progressive in dev) |
+| [`@archwall/rollup`](packages/rollup) | Rollup adapter, and the shared implementation for every Rollup-shaped host |
+| [`@archwall/vite`](packages/vite) | `@archwall/rollup` in build, plus progressive dev-mode analysis |
 | [`@archwall/bundler-plugin`](packages/bundler-plugin) | Shared plugin for bundlers exposing webpack's compilation API |
 | [`@archwall/rspack`](packages/rspack) | Rspack-shaped surface over `@archwall/bundler-plugin` |
 | [`@archwall/webpack`](packages/webpack) | webpack-shaped surface over `@archwall/bundler-plugin` |
 | [`@archwall/cli`](packages/cli) | Standalone CLI (own resolver: oxc-resolver + es-module-lexer) |
 | [`@archwall/test-utils`](packages/test-utils) | Fixture graphs + assertions for extension authors |
 | [`archwall`](packages/archwall) | Umbrella: `defineConfig`, the three presets, **all eight rules**, `defineRule`, … |
+
+## Writing a rule
+
+A rule declares **what it wants to look at**; the engine owns the traversal, resolves each
+distinct slice once, and shares it with every rule that asked for the same one.
+
+```ts
+import { defineRule } from "archwall";
+
+export const noUpwardImports = defineRule({
+  meta: {
+    name: "no-upward-imports",
+    description: "Modules may not import a higher layer.",
+    defaultSeverity: "error",
+    messages: { upward: '"{from}" may not import higher layer "{toLayer}"' },
+  },
+  visits: {
+    edges: {
+      // Only edges crossing a `layer` boundary can violate this, so only those are visited.
+      filter: () => ({ crossing: "layer" }),
+      visit(edge, ctx) {
+        ctx.report({ edge, messageId: "upward", data: { from: edge.from, toLayer: "…" } });
+      },
+    },
+  },
+});
+```
+
+`check(ctx)` is still available for rules that genuinely need the whole graph at once —
+cycle detection, reachability — but it is the exception, not the interface.
 
 ## The module graph
 
@@ -151,16 +203,28 @@ is still a true fact, and removing the node would silently change the graph's sh
 ## API stability
 
 - **Stable** (semver-major to break): config shape, rule/preset/reporter contracts, umbrella exports, the graph IR (`ModuleKind`, `Edge`, capabilities), violation fingerprints.
-- **Experimental** (may change in minors while maturing): analyses API, adapter internals beyond `createArchWallRun`, progressive-delivery semantics.
+- **Experimental** (may change in minors while maturing): graph-computation API, adapter internals beyond `createArchWallRun`, progressive-delivery semantics.
+
+The graph's *representation* is deliberately **not** part of the IR. `ProjectGraph` is an
+opaque handle read through methods, and transforms write through a mutation API — so an
+interned or columnar store stays reachable without an IR major.
 
 `EdgeKind` and `Capability` are **open** unions: new graph facts (CSS imports, worker edges,
 type edges) and adapter-specific capabilities arrive additively, never as an IR major. Treat an
 unrecognised kind as "some dependency exists"; never assume exhaustiveness.
 
 Every violation carries a **`fingerprint`** — a stable, machine-independent identity derived
-from the rule instance and the offending edge, deliberately *not* from the message, so
+from the rule instance and the offending locations, deliberately *not* from the message, so
 rewording a rule does not invalidate it. It is emitted in `partialFingerprints` in SARIF and is
 the intended key for a future baseline file.
+
+A violation carries a **list** of `locations`, not one. A cycle is one finding about N files,
+and every consumer — console, SARIF, a future baseline — sees all of them. It also carries
+`messageId` and `data`, so a consumer never has to parse English to recover which layers or
+which specifier a finding was about.
+
+Why the architecture is shaped this way, and what was rejected, is recorded in
+[**docs/adr**](docs/adr/README.md).
 
 ## Known limitations (v1)
 
@@ -169,6 +233,9 @@ the intended key for a future baseline file.
 - **No baseline file yet.** Adopting ArchWall on an existing codebase reports everything at once, and a graph-based linter has no source text in which to put an ignore comment. Violation fingerprints ship now so the baseline can land later without changing violation identity.
 - The full inventory of what static dependency analysis can and cannot prove — including why Nx-style project tags and DDD aggregate boundaries are out of scope — is in [`docs/presets/limitations.md`](docs/presets/limitations.md).
 - Packages currently run from TypeScript sources via workspace `main` fields (great for the monorepo and tests); a dist build step is required before publishing — until then, run the CLI programmatically (`import { check } from "@archwall/cli"`) or through the test suite rather than the `archwall` bin.
+- **`no-deep-imports` does not run under Vite.** Vite 8 expands aliases before any plugin observes an import, so the adapter cannot see what the author wrote and does not claim `raw-specifiers`; the rule is skipped with a diagnostic rather than silently matching nothing. Use the CLI, Rspack/webpack, or a Rollup build with the plugin ordered first — or `public-api`, which enforces the same intent from the graph side.
+- **No incremental validation.** Every run analyses the whole graph. The rule model now declares what each rule looks at, which is the prerequisite for invalidating only the rules a changed edge can affect — but the caching itself is not built.
+- **The conformance fixtures are not published.** `assertGraphsMatch` and the `*_EXPECTED` sets are exported, but the fixtures they run against live in the repository, so a third-party adapter author cannot yet run the suite that defines conformance.
 
 ## Development
 

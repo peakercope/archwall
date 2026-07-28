@@ -1,4 +1,5 @@
 import type { Reporter, Violation } from "@archwall/core";
+import { primaryEdge } from "@archwall/core";
 import { assertViolationsMatch, FSD_APP_EXPECTED } from "@archwall/integration-kit";
 import { fsd } from "@archwall/presets";
 import ArchWallPlugin from "@archwall/rspack";
@@ -48,7 +49,7 @@ describe("@archwall/rspack with webpack", () => {
     );
     const layered = collected.find((v) => v.ruleName === "layer-dependencies");
     // shared/lib/bad.ts imports widgets on its first line.
-    expect(layered?.edge?.loc).toMatchObject({ line: 1 });
+    expect(primaryEdge(layered!)?.loc).toMatchObject({ line: 1 });
   }, 60_000);
 
   it("fails the build per failOn: error (discovering archwall.config.ts)", async () => {

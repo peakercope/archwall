@@ -3,10 +3,8 @@ import type { StandardSchemaIssue, StandardSchemaV1 } from "@archwall/core";
 /**
  * A dependency-free Standard Schema builder, just big enough for rule options.
  *
- * Rules shipped `optionsSchema` as dead metadata: the field existed, nothing populated it,
- * and so `layerDependencies({})` from a plain-JS config crashed inside `layers.indexOf` and
- * surfaced as an opaque `rule-failed` with a stack trace. The very first thing a user gets
- * wrong should produce a sentence telling them what is wrong.
+ * Every rule populates `optionsSchema`, so the first thing a user gets wrong produces a
+ * sentence naming the mistake rather than an opaque `rule-failed` from inside the rule.
  *
  * Deliberately not zod/valibot: `@archwall/rules` is on the dependency path of every
  * install, and validating a handful of option bags does not justify a runtime dependency.

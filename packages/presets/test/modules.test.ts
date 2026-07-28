@@ -1,5 +1,5 @@
 import type { Preset, ProjectGraph, Violation } from "@archwall/core";
-import { analyze, resolveConfig } from "@archwall/core";
+import { analyze, primaryEdge, resolveConfig } from "@archwall/core";
 import { modules, modulesClassifier } from "@archwall/presets";
 import { buildFixtureGraph } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
@@ -55,7 +55,7 @@ describe("modules preset", () => {
     });
     const v = await run(modules({ ...opts, depends: { billing: ["identity"] } }), g);
     expect(v.map((x) => x.ruleId)).toEqual(["modules/friend-modules"]);
-    expect(v[0]!.edge?.from).toBe(f("identity/index.ts"));
+    expect(primaryEdge(v[0]!)?.from).toBe(f("identity/index.ts"));
   });
 
   it("lets every module reach `shared` without declaring it", async () => {
@@ -77,7 +77,7 @@ describe("modules preset", () => {
     });
     const v = await run(modules(opts), g);
     expect(v.map((x) => x.ruleId)).toEqual(["modules/public-api"]);
-    expect(v[0]!.edge?.to).toBe(f("billing/model/invoice.ts"));
+    expect(primaryEdge(v[0]!)?.to).toBe(f("billing/model/invoice.ts"));
   });
 
   it("reports a forbidden deep cross-module import once per distinct fault", async () => {

@@ -1,0 +1,48 @@
+{
+  "name": "@archwall/rollup",
+  "version": "0.0.0",
+  "description": "Rollup adapter for ArchWall, and the shared implementation for every Rollup-shaped host.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peakercope/archwall.git",
+    "directory": "packages/rollup"
+  },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@archwall/integration-kit": "workspace:^"
+  },
+  "peerDependencies": {
+    "rollup": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "rollup": {
+      "optional": true
+    }
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.mjs",
+      "./package.json": "./package.json"
+    }
+  },
+  "devDependencies": {
+    "@archwall/presets": "workspace:^",
+    "@archwall/rules": "workspace:^",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "rollup": "^4.62.3",
+    "tslib": "^2.8.1"
+  }
+}

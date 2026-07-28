@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { check } from "@archwall/cli";
-import type { ConfiguredRule, ProjectGraph, UserConfig } from "@archwall/core";
+import type { ConfiguredRule, UserConfig } from "@archwall/core";
 import { configureRule, defineRule } from "@archwall/core";
 import type { GraphSnapshot } from "@archwall/integration-kit";
 import { assertGraphsMatch, graphSnapshot } from "@archwall/integration-kit";
@@ -37,19 +37,9 @@ function snapshotProbe(
         defaultSeverity: "warn",
       },
       check(ctx) {
-        const graph: ProjectGraph = {
-          irVersion: "1.0.0",
-          host: { name: "probe", version: "0", capabilities: new Set() },
-          delivery: "complete",
-          modules: new Map(
-            ctx.graph
-              .modules()
-              .toArray()
-              .map((m) => [m.id, m]),
-          ),
-          edges: [...ctx.graph.edges()],
-        };
-        sink.snapshot = graphSnapshot(graph, SRC, { edgeKinds });
+        // Straight from the query a rule already has — no reconstruction of the graph, and
+        // therefore no hand-written copy of the representation the IR keeps private.
+        sink.snapshot = graphSnapshot(ctx.graph, SRC, { edgeKinds });
       },
     }),
   );

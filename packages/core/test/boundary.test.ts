@@ -22,7 +22,7 @@ function graph(files: { id: string; kind?: ModuleKind }[]): ProjectGraph {
 }
 
 function kinds(g: ProjectGraph): Record<string, ModuleKind> {
-  return Object.fromEntries([...g.modules.values()].map((m) => [m.id, m.kind]));
+  return Object.fromEntries([...g.modules()].map((m) => [m.id, m.kind]));
 }
 
 const bound = (g: ProjectGraph, include: string[], exclude: string[] = []) =>
@@ -39,7 +39,7 @@ describe("project boundary", () => {
     const out = bound(g, ["**"], ["**/*.test.*"]);
     // Still present: an edge INTO an excluded file is a real fact about the graph, and
     // deleting the node would silently change its shape (cycles through it would vanish).
-    expect(out.modules.size).toBe(2);
+    expect(out.moduleCount).toBe(2);
     expect(kinds(out)["/proj/src/a.test.ts"]).toBe("excluded");
   });
 

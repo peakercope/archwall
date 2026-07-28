@@ -35,7 +35,7 @@ describe("built-in rule options schemas", () => {
     // looks exactly like success: the rule runs with the default you believed you changed.
     const messages = diagnose(requireTag, { tag: "layer", withn: ["src/**"] });
     expect(messages[0]).toMatch(/"withn" is not a recognised option/);
-    expect(messages[0]).toMatch(/message, tag, within/);
+    expect(messages[0]).toMatch(/tag, within/);
   });
 
   it("validates nested matcher shapes", () => {

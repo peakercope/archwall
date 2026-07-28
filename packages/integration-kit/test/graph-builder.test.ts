@@ -13,11 +13,11 @@ describe("GraphBuilder", () => {
       .build();
     expect(g.irVersion).toBe(IR_VERSION);
     expect(g.delivery).toBe("complete");
-    expect(g.modules.get("/a.ts")).toMatchObject({
+    expect(g.module("/a.ts")).toMatchObject({
       file: "/a.ts",
       kind: "source",
     });
-    expect(g.edges[0]).toMatchObject({
+    expect(g.edges()[0]).toMatchObject({
       rawSpecifier: "/b.ts",
       resolvedPath: "/b.ts",
       kind: "static",
@@ -28,15 +28,15 @@ describe("GraphBuilder", () => {
       .addModule({ id: "x" })
       .addModule({ id: "x", packageName: "pkg" })
       .build();
-    expect(g.modules.size).toBe(1);
-    expect(g.modules.get("x")!.packageName).toBe("pkg");
+    expect(g.moduleCount).toBe(1);
+    expect(g.module("x")!.packageName).toBe("pkg");
   });
   it("auto-registers an unknown bare edge target as a package, not as unresolved", () => {
     const g = new GraphBuilder({ host })
       .addModule({ id: "a" })
       .addEdge({ from: "a", to: "react" })
       .build();
-    expect(g.modules.get("react")).toMatchObject({
+    expect(g.module("react")).toMatchObject({
       kind: "package",
       packageName: "react",
       file: null,
@@ -54,6 +54,6 @@ describe("GraphBuilder", () => {
       .addEdge({ from: "a", to: "b" })
       .addEdge({ from: "a", to: "b" })
       .build();
-    expect(g.edges).toHaveLength(1);
+    expect(g.edges()).toHaveLength(1);
   });
 });

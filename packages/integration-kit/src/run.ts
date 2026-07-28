@@ -12,7 +12,8 @@ import type {
 } from "@archwall/core";
 import { analyze, countBySeverity, resolveConfig, resolveReporters } from "@archwall/core";
 import { GraphBuilder } from "./graph-builder.js";
-import { loadConfig } from "./load-config.js";
+import { loadConfig, materializeConfig } from "./load-config.js";
+import { nodeIO } from "./node-io.js";
 
 export interface CreateRunOptions {
   host: HostInfo;
@@ -20,7 +21,7 @@ export interface CreateRunOptions {
   config?: UserConfig;
   configPath?: string;
   cwd?: string;
-  /** Forwarded to built-in reporters. */
+  /** Forwarded to reporters. Defaults to a filesystem-capable IO rooted at `cwd`. */
   io?: ReporterIO;
   /**
    * Transforms the HOST contributes, appended after the config's own.
@@ -50,6 +51,8 @@ const DIAGNOSTIC_GATES: Record<keyof ResolvedFailOnDiagnostics, readonly string[
   ruleSkipped: ["rule-skipped"],
   emptyAnalysis: ["no-modules-classified", "empty-project"],
   invalidOptions: ["invalid-rule-options"],
+  invalidConfig: ["invalid-config"],
+  deprecated: ["rule-deprecated"],
 };
 
 function failingDiagnostics(
@@ -72,29 +75,29 @@ export interface ArchWallRun {
   analyze(graph: ProjectGraph): Promise<RunResult>;
 }
 
+const DEFAULT_GATES: ResolvedFailOnDiagnostics = {
+  ruleFailed: true,
+  ruleSkipped: false,
+  emptyAnalysis: false,
+  invalidOptions: true,
+  invalidConfig: true,
+  deprecated: false,
+};
+
 /**
- * The single definition of pass/fail and of the one-line summary. Both used to be
- * computed here *and* independently in the console reporter, with different wording —
- * two implementations of one policy is how the CLI's exit code and its printed output
- * drift apart.
+ * The single definition of pass/fail and of the one-line summary. Two implementations of
+ * one policy is how an exit code and its printed output drift apart, so there is one.
  */
 export function summarize(
   result: AnalysisResult,
   failOn: ResolvedConfig["failOn"],
-  failOnDiagnostics: ResolvedFailOnDiagnostics = {
-    ruleFailed: true,
-    ruleSkipped: false,
-    emptyAnalysis: false,
-    invalidOptions: true,
-  },
+  failOnDiagnostics: ResolvedFailOnDiagnostics = DEFAULT_GATES,
 ): Omit<RunResult, "result"> {
   const { error, warn, info } = countBySeverity(result.violations);
   const byViolation = failOn === "never" ? false : failOn === "warn" ? error + warn > 0 : error > 0;
 
-  // Diagnostics are a separate gate, not a severity tier of violations. This used to be
-  // missing entirely: `rule-failed` was `severity: "error"` and yet counted for nothing,
-  // so a rule that threw in CI passed green — the worst possible outcome for a tool whose
-  // whole job is enforcement.
+  // Diagnostics are a separate gate, not a severity tier of violations. Without this a rule
+  // that threw passed green in CI — the worst possible outcome for an enforcement tool.
   const blocking = failingDiagnostics(result, failOnDiagnostics);
 
   const parts = [`${error} error(s)`, `${warn} warning(s)`];
@@ -112,7 +115,10 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
   let userConfig: UserConfig;
   let configFile: string | null = null;
   if (opts.config !== undefined) {
-    userConfig = opts.config;
+    // An inline config gets the same `extends` and named-plugin treatment a file does —
+    // otherwise `extends` would work in `archwall.config.ts` and silently not in
+    // `archwall({ config: { extends: … } })`, which is the same config either way.
+    userConfig = await materializeConfig(opts.config, { cwd });
   } else {
     const loaded = await loadConfig({
       cwd,
@@ -124,11 +130,9 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
   const resolved = resolveConfig(userConfig, { cwd });
   const config: ResolvedConfig =
     opts.transforms !== undefined && opts.transforms.length > 0
-      ? {
-          ...resolved,
-          transforms: [...resolved.transforms, ...opts.transforms],
-        }
+      ? { ...resolved, transforms: [...resolved.transforms, ...opts.transforms] }
       : resolved;
+  const io = opts.io ?? nodeIO(cwd);
   let runCounter = 0;
 
   return {
@@ -143,30 +147,28 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
     async analyze(graph) {
       const startedAt = Date.now();
       const runId = `${startedAt}-${++runCounter}`;
-      // Built-ins are constructed PER RUN. The run object is memoized across watch
-      // rebuilds in both bundler adapters, so a reporter built once here outlives every
-      // rebuild — and any per-run state it holds accumulates for the life of the process.
-      // Reporters the user passed as objects are theirs; they get `runId` instead.
-      const reporters = resolveReporters(config.reporterSpecs, opts.io);
-      for (const r of reporters) {
-        await r.onRunStart?.({
-          runId,
-          host: graph.host,
-          startedAt,
-          repoRoot: config.repoRoot,
-        });
+      // Built-ins are constructed PER RUN. The run object is memoized across watch rebuilds
+      // in the bundler adapters, so a reporter built once here outlives every rebuild — and
+      // any per-run state it holds accumulates for the life of the process. Reporters the
+      // user passed as objects are theirs; they get `runId` instead.
+      const { reporters, close } = resolveReporters(config.reporterSpecs, io);
+      try {
+        for (const r of reporters) {
+          await r.onRunStart?.({ runId, host: graph.host, startedAt, repoRoot: config.repoRoot });
+        }
+        const result = await analyze(graph, config);
+        for (const r of reporters) {
+          if (r.onViolation) for (const v of result.violations) await r.onViolation(v);
+        }
+        // Awaited: a reporter that writes a file or flushes a socket must complete before
+        // the caller acts on the result (the CLI sets an exit code immediately after).
+        for (const r of reporters) await r.onRunEnd(result);
+        return { result, ...summarize(result, config.failOn, config.failOnDiagnostics) };
+      } finally {
+        // In `finally` so a reporter that throws still leaves complete files behind rather
+        // than truncated ones.
+        await close();
       }
-      const result = await analyze(graph, config);
-      for (const r of reporters) {
-        if (r.onViolation) for (const v of result.violations) await r.onViolation(v);
-      }
-      // Awaited: a reporter that writes a file or flushes a socket must complete before
-      // the caller acts on the result (the CLI sets an exit code immediately after).
-      for (const r of reporters) await r.onRunEnd(result);
-      return {
-        result,
-        ...summarize(result, config.failOn, config.failOnDiagnostics),
-      };
     },
   };
 }

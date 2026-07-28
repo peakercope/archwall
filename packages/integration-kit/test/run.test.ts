@@ -1,7 +1,7 @@
 import * as path from "node:path";
 // Rule authoring is a CORE concern, not an adapter one — integration-kit deliberately
 // stopped re-exporting all of core, so there is exactly one import path for each symbol.
-import { configureRule, defineRule } from "@archwall/core";
+import { configureRule, defineRule, primaryModule } from "@archwall/core";
 import { createArchWallRun, loadConfig } from "@archwall/integration-kit";
 import { describe, expect, it } from "vitest";
 
@@ -38,7 +38,7 @@ describe("createArchWallRun", () => {
     const run = await createArchWallRun({
       host,
       cwd: fixtureDir,
-      io: { write: (l) => lines.push(l) },
+      io: { open: () => ({ write: (l: string) => lines.push(l) }) },
     });
     const graph = run
       .graphBuilder()
@@ -89,7 +89,7 @@ describe("createArchWallRun", () => {
     });
     const graph = run.graphBuilder().addModule({ id: "/elsewhere/app.ts" }).build();
     const { result } = await run.analyze(graph);
-    expect(result.violations.map((v) => v.module)).toEqual(["/elsewhere/app.ts"]);
+    expect(result.violations.map((v) => primaryModule(v))).toEqual(["/elsewhere/app.ts"]);
   });
 
   it("fails the run when a rule crashes, even though it produced no violations", async () => {
@@ -152,7 +152,7 @@ describe("createArchWallRun", () => {
     const run = await createArchWallRun({
       host,
       cwd: fixtureDir,
-      io: { write: () => void lines++ },
+      io: { open: () => ({ write: () => void lines++ }) },
       config: { reporters: ["console"], failOn: "never" },
     });
     const graph = () =>
@@ -199,7 +199,7 @@ describe("createArchWallRun", () => {
     const run = await createArchWallRun({
       host,
       cwd: fixtureDir,
-      io: { write: () => {} },
+      io: { open: () => ({ write: () => {} }) },
     });
     const graph = run.graphBuilder().addModule({ id: "/elsewhere/app.ts" }).build();
     const { result } = await run.analyze(graph);

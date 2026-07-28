@@ -32,7 +32,7 @@
     "@archwall/presets": "workspace:^",
     "@archwall/rspack": "workspace:^",
     "@archwall/vite": "workspace:^",
-    "@rspack/core": "^2.1.5",
+    "@rspack/core": "^2.1.6",
     "@swc/core": "^1.15.46",
     "@types/picomatch": "^4.0.3",
     "swc-loader": "^0.2.7",

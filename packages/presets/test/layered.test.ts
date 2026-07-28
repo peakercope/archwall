@@ -1,5 +1,5 @@
 import type { Preset, ProjectGraph, Violation } from "@archwall/core";
-import { analyze, resolveConfig } from "@archwall/core";
+import { analyze, primaryEdge, resolveConfig } from "@archwall/core";
 import { layered, layeredClassifier } from "@archwall/presets";
 import { buildFixtureGraph } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
@@ -87,7 +87,7 @@ describe("layered preset", () => {
     });
     const v = await run(layered({ ...opts, pure: ["domain"], allowExternals: ["zod"] }), g);
     expect(v.map((x) => x.ruleId)).toEqual(["layered/purity-domain"]);
-    expect(v[0]!.edge?.to).toBe("axios");
+    expect(primaryEdge(v[0]!)?.to).toBe("axios");
     expect(v[0]!.message).toContain("domain");
   });
 

@@ -1,7 +1,7 @@
-import type { Reporter } from "../contracts/reporter.js";
+import type { OutputSink, Reporter } from "../contracts/reporter.js";
 import { toRelative } from "../paths.js";
-import type { Severity } from "../violations.js";
-import { defaultIO, type ReporterIO } from "./console.js";
+import type { Severity, Violation } from "../violations.js";
+import { primarySourceLocation } from "../violations.js";
 
 /** ArchWall's vocabulary is not SARIF's; `info` is SARIF's "note". */
 const SARIF_LEVEL: Record<Severity, string> = {
@@ -10,15 +10,50 @@ const SARIF_LEVEL: Record<Severity, string> = {
   info: "note",
 };
 
-export function sarifReporter(io: ReporterIO = defaultIO): Reporter {
+/**
+ * SARIF locations for a violation.
+ *
+ * All of them, not just the first: a cycle is one result about N files, and SARIF's
+ * `locations` array is exactly the right shape for that. Locations without a source
+ * position are omitted — SARIF needs a `physicalLocation`, and inventing line 1 for a
+ * module the host gave us no position for would point reviewers at the wrong line.
+ */
+function sarifLocations(repoRoot: string, v: Violation): unknown[] {
+  const out: unknown[] = [];
+  for (const l of v.locations) {
+    const loc = l.type === "edge" ? l.edge.loc : l.type === "path" ? l.loc : undefined;
+    if (loc === undefined) continue;
+    out.push({
+      physicalLocation: {
+        // MUST be root-relative: GitHub code scanning silently fails to associate a result
+        // with a repository file when given an absolute path from the producing machine.
+        artifactLocation: { uri: toRelative(repoRoot, loc.file) },
+        region: { startLine: loc.line, startColumn: loc.column + 1 },
+      },
+    });
+  }
+  if (out.length > 0) return out;
+  // No positions anywhere: fall back to naming the file, without a region.
+  const fallback = primarySourceLocation(v);
+  if (fallback !== undefined) {
+    return [
+      {
+        physicalLocation: {
+          artifactLocation: { uri: toRelative(repoRoot, fallback.file) },
+        },
+      },
+    ];
+  }
+  return [];
+}
+
+export function sarifReporter(sink: OutputSink): Reporter {
   return {
     name: "sarif",
     onRunEnd(result) {
       // Built from the rule INVENTORY, not from the violations: a rule that found nothing
       // still belongs in `tool.driver.rules`, and only the inventory carries the metadata
-      // (`description`, `docsUrl`) that makes the entry worth anything to a consumer.
-      // These used to be emitted as bare `{ id }` while `meta.description`/`meta.docsUrl`
-      // sat unread.
+      // that makes the entry worth anything to a consumer.
       const described = new Map(result.rules.map((r) => [r.id, r]));
       for (const v of result.violations) {
         if (!described.has(v.ruleId)) {
@@ -62,29 +97,12 @@ export function sarifReporter(io: ReporterIO = defaultIO): Reporter {
               },
               // Lets consuming tools track a finding across commits even as it moves.
               partialFingerprints: { archwall: v.fingerprint },
-              locations: v.edge?.loc
-                ? [
-                    {
-                      physicalLocation: {
-                        // MUST be root-relative: GitHub code scanning silently fails to
-                        // associate a result with a repository file when given an
-                        // absolute path from the machine that produced the run.
-                        artifactLocation: {
-                          uri: toRelative(result.repoRoot, v.edge.loc.file),
-                        },
-                        region: {
-                          startLine: v.edge.loc.line,
-                          startColumn: v.edge.loc.column + 1,
-                        },
-                      },
-                    },
-                  ]
-                : [],
+              ...(v.data !== undefined ? { properties: v.data } : {}),
+              locations: sarifLocations(result.repoRoot, v),
             })),
-            // Diagnostics used to be dropped entirely, which meant
-            // `no-modules-classified` — "ArchWall never looked at your code" — was
-            // invisible in exactly the CI-integrated path where it matters most. SARIF
-            // has a channel for tool-level notifications; this is it.
+            // SARIF has a channel for tool-level notifications; diagnostics belong in it.
+            // Dropping them made `no-modules-classified` — "ArchWall never looked at your
+            // code" — invisible in exactly the CI path where it matters most.
             invocations: [
               {
                 executionSuccessful: !result.diagnostics.some((d) => d.severity === "error"),
@@ -99,7 +117,7 @@ export function sarifReporter(io: ReporterIO = defaultIO): Reporter {
           },
         ],
       };
-      io.write(JSON.stringify(doc, null, 2));
+      sink.write(JSON.stringify(doc, null, 2));
     },
   };
 }

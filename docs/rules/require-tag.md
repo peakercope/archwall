@@ -17,7 +17,6 @@ export default defineConfig({
 |---|---|---|---|
 | `tag` | `string` | *required* | The tag key every matched module must carry. |
 | `within` | `string[]` | `["**"]` | Glob-lite paths, relative to `sourceRoot`. |
-| `message` | `string` | — | Replaces the default message. |
 
 ## Why this rule exists
 
@@ -45,3 +44,14 @@ deliberately left unclassified should be outside `within`, not fighting this rul
 
 Both the [`layered()`](../presets/layered.md) and [`modules()`](../presets/modules.md)
 presets add this rule when you set `strict: true`.
+
+## Custom wording
+
+The rule no longer takes a `message` option. Retarget the wording per instance instead —
+which works for every rule, not just this one:
+
+```ts
+requireTag({ tag: "layer" }, { message: '{file} is not in any recognised layer' })
+```
+
+Placeholders are the `data` keys the rule reports: `file` and `tag`.

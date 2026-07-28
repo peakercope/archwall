@@ -1,9 +1,9 @@
-import type { Edge, ModuleKind, ModuleNode, ProjectGraph } from "@archwall/core";
+import type { Edge, ModuleKind, ModuleNode } from "@archwall/core";
 import {
   defineGraphComputation,
   GraphComputationCache,
   GraphQuery,
-  IR_VERSION,
+  ProjectGraph,
   stronglyConnectedComponents,
 } from "@archwall/core";
 import { describe, expect, it } from "vitest";
@@ -31,13 +31,12 @@ function edge(from: string, to: string, extra: Partial<Edge> = {}): Edge {
   };
 }
 function graph(mods: ModuleNode[], edges: Edge[]): ProjectGraph {
-  return {
-    irVersion: IR_VERSION,
+  return ProjectGraph.create({
     host: { name: "test", version: "0", capabilities: new Set() },
     delivery: "complete",
     modules: new Map(mods.map((m) => [m.id, m])),
-    edges,
-  };
+    edges: edges,
+  });
 }
 
 describe("GraphComputationCache", () => {

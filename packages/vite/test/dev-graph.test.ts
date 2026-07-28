@@ -1,3 +1,4 @@
+import { prepareGraph } from "@archwall/core";
 import { dropSelfEdges, GraphBuilder } from "@archwall/integration-kit";
 import type { DevModuleLike } from "@archwall/vite";
 import { addDevModules } from "@archwall/vite";
@@ -22,8 +23,8 @@ describe("addDevModules", () => {
     addDevModules(builder, [a, b, anon]);
     const g = builder.build();
     expect(g.delivery).toBe("progressive");
-    expect(g.modules.size).toBe(2);
-    expect(g.edges).toEqual([
+    expect(g.moduleCount).toBe(2);
+    expect(g.edges()).toEqual([
       {
         from: "/a.ts",
         to: "/b.ts",
@@ -48,7 +49,13 @@ describe("addDevModules", () => {
     addDevModules(builder, [a]);
 
     const raw = builder.build();
-    expect(raw.edges).toHaveLength(1);
-    expect(dropSelfEdges().transform(raw, { sourceRoot: "/", repoRoot: "/" }).edges).toEqual([]);
+    expect(raw.edges()).toHaveLength(1);
+    const dropped = prepareGraph(
+      raw,
+      { sourceRoot: "/", repoRoot: "/", include: ["**"], exclude: [] },
+      [dropSelfEdges()],
+      [],
+    ).graph;
+    expect(dropped.edges()).toEqual([]);
   });
 });

@@ -1,22 +1,30 @@
-import * as path from "node:path";
 import { GraphComputationCache } from "../analysis/cache.js";
-import type { ResolvedConfig } from "../config.js";
+import type { ResolvedConfig, ResolvedRule } from "../config.js";
 import type { Diagnostic } from "../contracts/diagnostic.js";
 import type { AnalysisResult, RuleRunInfo } from "../contracts/reporter.js";
 import type { RuleContext, RuleScope } from "../contracts/rule.js";
-import type { Capability, ModuleId, ProjectGraph } from "../graph/ir.js";
+import type { Capability, Edge, ModuleId, ModuleNode, ProjectGraph } from "../graph/ir.js";
 import { assertIrCompatible } from "../graph/ir.js";
-import { GraphQuery } from "../graph/query.js";
+import { filterKey, GraphQuery } from "../graph/query.js";
 import { matchesPattern } from "../match.js";
+import { sourceRelative } from "../paths.js";
 import type { Severity, Violation } from "../violations.js";
-import { compareViolations, fingerprintOf } from "../violations.js";
-import { applyProjectBoundary } from "./boundary.js";
-import { applyClassifiers } from "./classify.js";
+import { compareViolations, fingerprintOf, locationsOf, renderMessage } from "../violations.js";
 import { prepareGraph } from "./prepare.js";
 
+/** Per-rule state the dispatcher carries while a run is in flight. */
+interface RuleRun {
+  resolved: ResolvedRule;
+  ctx: RuleContext<unknown>;
+  info: RuleRunInfo;
+  /** Set once the rule throws; it takes no further part in the run. */
+  failed: boolean;
+}
+
 /**
- * The engine: bound the project, classify, then check. Pure — no I/O, no reporter calls;
- * reporters are driven by the run edge (integration-kit).
+ * The engine: prepare the graph (boundary → transforms → classify), then check it.
+ *
+ * Pure — no I/O, no reporter calls; reporters are driven by the run edge (integration-kit).
  */
 export async function analyze(
   graph: ProjectGraph,
@@ -25,86 +33,70 @@ export async function analyze(
   const started = performance.now();
   assertIrCompatible(graph.irVersion);
 
-  const configDiagnostics: Diagnostic[] = [...config.diagnostics];
+  const diagnostics: Diagnostic[] = [...config.diagnostics];
 
   const effective = new Set<Capability>(graph.host.capabilities);
-  // In progressive delivery the absence of a module is not evidence; completeness-
-  // dependent rules must not run even if the host is capable in principle.
+  // In progressive delivery the absence of a module is not evidence; completeness-dependent
+  // rules must not run even if the host is capable in principle.
   if (graph.delivery === "progressive") effective.delete("complete-graph");
 
-  // Transforms run between the boundary and classification: after the project's shape is
-  // known, before anything is tagged, so what they add is classified like everything else.
-  //
-  // The boundary therefore still runs on its own here. Fusing it with classification (see
-  // `prepareGraph`) would put transforms on the wrong side of one or the other, so the
-  // fused pass is used only when there is nothing to run in between — which is the common
-  // case and the one the allocation budget is about.
-  let transformed = config.transforms.length === 0 ? graph : applyProjectBoundary(graph, config);
-  for (const t of config.transforms) {
-    try {
-      transformed = t.transform(transformed, {
-        sourceRoot: config.sourceRoot,
-        repoRoot: config.repoRoot,
-      });
-      for (const c of t.provides ?? []) effective.add(c);
-    } catch (err) {
-      // Same isolation a rule gets, for the same reason: one broken enricher must not
-      // destroy the run. Its capabilities are NOT added, so rules depending on them skip
-      // loudly rather than running against a graph that never got enriched.
-      configDiagnostics.push({
-        code: "transform-failed",
-        severity: "error",
-        message: `Graph transform "${t.name}" threw and was skipped: ${err instanceof Error ? err.message : String(err)}`,
-        ...(err instanceof Error && err.stack !== undefined
-          ? { details: { stack: err.stack } }
-          : {}),
-      });
-    }
-  }
+  const prepared = prepareGraph(graph, config, config.transforms, config.classifiers);
+  const classified = prepared.graph;
+  diagnostics.push(...prepared.diagnostics);
+  for (const c of prepared.provided) effective.add(c);
 
-  const classifierCtx = { sourceRoot: config.sourceRoot };
-  const classified =
-    config.transforms.length === 0
-      ? // One pass over the modules instead of two, and no copy at all for a module that
-        // neither the boundary re-kinded nor a classifier tagged.
-        prepareGraph(transformed, config, config.classifiers, classifierCtx)
-      : applyClassifiers(transformed, config.classifiers, classifierCtx);
   const query = new GraphQuery(classified);
   const cache = new GraphComputationCache(query);
+  const relative = (file: string): string | null => sourceRelative(config.sourceRoot, file);
 
-  // One scoped view per DISTINCT scope, not per rule: "FSD under apps/web" is typically
-  // the scope of several rules at once, and they can share the computation.
+  // One scoped VIEW per distinct scope — sharing the base query's index, not rebuilding it.
+  // "FSD under apps/web" is typically the scope of several rules at once.
   const scopedQueries = new Map<string, GraphQuery>();
-  const queryFor = (scope: RuleScope | undefined): GraphQuery => {
+  const scopeKeyOf = (scope: RuleScope | undefined): string =>
+    scope === undefined
+      ? "*"
+      : JSON.stringify([scope.include ?? null, scope.exclude ?? null, scope.tag ?? null]);
+  const queryFor = (scope: RuleScope | undefined, key: string): GraphQuery => {
     if (scope === undefined) return query;
-    const key = JSON.stringify([scope.include ?? null, scope.exclude ?? null, scope.tag ?? null]);
     let scoped = scopedQueries.get(key);
     if (!scoped) {
-      scoped = new GraphQuery(classified, modulesInScope(classified, scope, config.sourceRoot));
+      scoped = query.scoped(modulesInScope(classified, scope, config.sourceRoot));
       scopedQueries.set(key, scoped);
     }
     return scoped;
   };
 
   const violations: Violation[] = [];
-  // Config-time findings come first: they explain why a rule you configured is missing
-  // from this run at all.
-  const diagnostics: Diagnostic[] = configDiagnostics;
+  const runs: RuleRun[] = [];
 
-  const inventory: RuleRunInfo[] = [];
-  const describe = (
-    rule: (typeof config.rules)[number]["rule"],
-    id: string,
-    severity: Severity,
-  ): Omit<RuleRunInfo, "status" | "violations" | "durationMs"> => ({
-    id,
-    name: rule.meta.name,
-    description: rule.meta.description,
-    ...(rule.meta.docsUrl !== undefined ? { docsUrl: rule.meta.docsUrl } : {}),
-    severity,
-  });
+  for (const resolved of config.rules) {
+    const { rule, id, options, severity, scope, message } = resolved;
+    const base: Omit<RuleRunInfo, "status" | "violations" | "durationMs"> = {
+      id,
+      name: rule.meta.name,
+      description: rule.meta.description,
+      ...(rule.meta.docsUrl !== undefined ? { docsUrl: rule.meta.docsUrl } : {}),
+      severity,
+      ...(rule.meta.deprecated !== undefined ? { deprecated: true } : {}),
+    };
 
-  for (const { rule, id, options, severity, scope } of config.rules) {
+    if (rule.meta.deprecated !== undefined) {
+      const d = rule.meta.deprecated;
+      diagnostics.push({
+        code: "rule-deprecated",
+        severity: "warn",
+        ruleId: id,
+        message:
+          `Rule "${rule.meta.name}" is deprecated since ${d.since}` +
+          (d.replacedBy !== undefined ? `; use "${d.replacedBy}" instead` : "") +
+          (d.reason !== undefined ? `. ${d.reason}` : "."),
+        details: {
+          since: d.since,
+          ...(d.replacedBy !== undefined ? { replacedBy: d.replacedBy } : {}),
+        },
+      });
+    }
+
     const missing = (rule.meta.requiredCapabilities ?? []).filter((c) => !effective.has(c));
     if (missing.length > 0) {
       diagnostics.push({
@@ -114,34 +106,75 @@ export async function analyze(
         message: `Rule "${rule.meta.name}" needs capabilities [${missing.join(", ")}] that host "${graph.host.name}" cannot provide in this mode; the rule was skipped. Run via a host with these capabilities for full coverage.`,
         details: { missingCapabilities: missing, host: graph.host.name },
       });
-      inventory.push({
-        ...describe(rule, id, severity),
-        status: "skipped",
-        violations: 0,
-        durationMs: 0,
-        missingCapabilities: missing,
+      runs.push({
+        resolved,
+        ctx: null as never,
+        info: {
+          ...base,
+          status: "skipped",
+          violations: 0,
+          durationMs: 0,
+          missingCapabilities: missing,
+        },
+        failed: true,
       });
       continue;
     }
 
+    if (rule.visits === undefined && rule.check === undefined) {
+      diagnostics.push({
+        code: "invalid-config",
+        severity: "error",
+        ruleId: id,
+        message: `Rule "${rule.meta.name}" declares neither \`visits\` nor \`check\`, so it can never report anything. This is a bug in the rule.`,
+      });
+      runs.push({
+        resolved,
+        ctx: null as never,
+        info: { ...base, status: "skipped", violations: 0, durationMs: 0 },
+        failed: true,
+      });
+      continue;
+    }
+
+    const templates = messageTemplates(rule.meta.messages, message);
+    const scopeKey = scopeKeyOf(scope);
     const ctx: RuleContext<unknown> = {
       // Already validated (and possibly transformed) by `resolveConfig`.
       options,
-      // Scoping happens HERE, once, for every rule that will ever exist — rather than as
-      // a `within` option each rule has to remember to implement.
-      graph: queryFor(scope),
+      // Scoping happens HERE, once, for every rule that will ever exist — rather than as a
+      // `within` option each rule has to remember to implement.
+      graph: queryFor(scope, scopeKey),
       sourceRoot: config.sourceRoot,
       repoRoot: config.repoRoot,
+      relative,
       compute: (c) => cache.get(c),
       report: (v) => {
-        // `identity` shapes the fingerprint and is not itself a property of the finding.
-        const { identity: _identity, ...rest } = v;
+        const locations = locationsOf(v);
+        const template = v.messageId !== undefined ? templates[v.messageId] : undefined;
+        let text: string;
+        if (v.message !== undefined) {
+          text = v.message;
+        } else if (template !== undefined) {
+          text = renderMessage(template, v.data);
+        } else {
+          text = `${rule.meta.name}: ${v.messageId ?? "(no message)"}`;
+          diagnostics.push({
+            code: "invalid-config",
+            severity: "error",
+            ruleId: id,
+            message: `Rule "${rule.meta.name}" reported messageId "${v.messageId ?? ""}" but no template is defined for it, in either \`meta.messages\` or the instance's \`message\`.`,
+          });
+        }
         violations.push({
           ruleName: rule.meta.name,
           ruleId: id,
-          ...rest,
-          // A rule may grade an individual finding; the configured severity is the default.
           severity: v.severity ?? severity,
+          message: text,
+          ...(v.messageId !== undefined ? { messageId: v.messageId } : {}),
+          ...(v.data !== undefined ? { data: v.data } : {}),
+          locations,
+          ...(v.explanation !== undefined ? { explanation: v.explanation } : {}),
           // Repo root, not source root: a fingerprint must survive someone reconfiguring
           // `sourceRoot`, and it is compared across machines and hosts.
           fingerprint: fingerprintOf(config.repoRoot, id, v),
@@ -149,72 +182,202 @@ export async function analyze(
       },
     };
 
-    // One broken rule must not destroy the other thirty-nine results. A third-party rule
-    // throwing is a bug report, not a reason to fail the whole run with a stack trace and
-    // no indication of which rule was at fault.
-    const before = violations.length;
-    const startedRule = performance.now();
-    let status: RuleRunInfo["status"] = "ran";
-    try {
-      await rule.check(ctx);
-    } catch (err) {
-      status = "failed";
-      diagnostics.push({
-        code: "rule-failed",
-        severity: "error",
-        ruleId: id,
-        message: `Rule "${id}" threw and produced no results: ${err instanceof Error ? err.message : String(err)}`,
-        ...(err instanceof Error && err.stack !== undefined
-          ? { details: { stack: err.stack } }
-          : {}),
-      });
-    }
-    inventory.push({
-      ...describe(rule, id, severity),
-      status,
-      violations: violations.length - before,
-      durationMs: performance.now() - startedRule,
+    runs.push({
+      resolved,
+      ctx,
+      info: { ...base, status: "ran", violations: 0, durationMs: 0 },
+      failed: false,
     });
+  }
+
+  const active = runs.filter((r) => !r.failed);
+  dispatchVisitors(active, diagnostics, scopeKeyOf);
+
+  // Whole-graph rules run after the traversal, and one at a time: they may be async, and
+  // several of them share the memoized computation cache.
+  for (const run of active) {
+    if (run.failed || run.resolved.rule.check === undefined) continue;
+    const startedRule = performance.now();
+    try {
+      await run.resolved.rule.check(run.ctx);
+    } catch (err) {
+      markFailed(run, err, diagnostics);
+    }
+    run.info.durationMs += performance.now() - startedRule;
+  }
+
+  // Rules interleave inside a shared traversal, so a start/end offset per rule would not
+  // attribute correctly; counts come from the violations themselves.
+  const perRule = new Map<string, number>();
+  for (const v of violations) perRule.set(v.ruleId, (perRule.get(v.ruleId) ?? 0) + 1);
+  for (const run of runs) {
+    if (run.info.status === "ran") run.info.violations = perRule.get(run.info.id) ?? 0;
   }
 
   diagnostics.push(...auditClassification(classified));
 
   return {
-    // Deterministic order: baselines, CI diffing, and snapshot tests all need two runs
-    // of the same analysis to be byte-identical.
+    // Deterministic order: baselines, CI diffing, and snapshot tests all need two runs of
+    // the same analysis to be byte-identical.
     violations: violations.sort(compareViolations),
     diagnostics,
-    rules: inventory,
+    rules: runs.map((r) => r.info),
     repoRoot: config.repoRoot,
     host: graph.host,
     delivery: graph.delivery,
     stats: {
-      moduleCount: classified.modules.size,
-      edgeCount: classified.edges.length,
+      moduleCount: classified.moduleCount,
+      edgeCount: classified.edgeCount,
       durationMs: performance.now() - started,
     },
   };
 }
 
 /**
+ * Runs every declared-interest rule, one traversal per distinct (scope, filter) pair.
+ *
+ * The filtered slice is materialized once and shared by every rule that asked for it, which
+ * is what makes the cost O(distinct slices + total visits) rather than O(rules × graph).
+ * Rules that want the whole edge list with no filter share the graph's own array and copy
+ * nothing at all.
+ *
+ * Isolation is per rule, not per visit: the try/catch wraps a rule's entire pass over the
+ * slice, so a rule that throws stops and is marked failed while the other thirty-nine keep
+ * their results — without paying for exception handling on every edge.
+ */
+function dispatchVisitors(
+  runs: readonly RuleRun[],
+  diagnostics: Diagnostic[],
+  scopeKeyOf: (scope: RuleScope | undefined) => string,
+): void {
+  interface Bucket<T> {
+    /** Evaluated once, then shared by every member. */
+    slice: () => readonly T[];
+    members: { run: RuleRun; visit: (item: T, ctx: RuleContext<unknown>) => void }[];
+  }
+
+  const edgeBuckets = new Map<string, Bucket<Edge>>();
+  const moduleBuckets = new Map<string, Bucket<ModuleNode>>();
+
+  for (const run of runs) {
+    const visits = run.resolved.rule.visits;
+    if (visits === undefined) continue;
+    const scopeKey = scopeKeyOf(run.resolved.scope);
+    const query = run.ctx.graph;
+
+    const edgeSpec = visits.edges;
+    if (edgeSpec !== undefined) {
+      try {
+        const filter = edgeSpec.filter?.(run.ctx.options);
+        const key = `${scopeKey}|e|${filterKey(filter)}`;
+        let bucket = edgeBuckets.get(key);
+        if (bucket === undefined) {
+          bucket = { slice: () => query.edges(filter), members: [] };
+          edgeBuckets.set(key, bucket);
+        }
+        bucket.members.push({
+          run,
+          visit: edgeSpec.visit as (e: Edge, c: RuleContext<unknown>) => void,
+        });
+      } catch (err) {
+        markFailed(run, err, diagnostics);
+        continue;
+      }
+    }
+
+    const moduleSpec = visits.modules;
+    if (moduleSpec !== undefined) {
+      try {
+        const filter = moduleSpec.filter?.(run.ctx.options);
+        const key = `${scopeKey}|m|${filterKey(filter)}`;
+        let bucket = moduleBuckets.get(key);
+        if (bucket === undefined) {
+          bucket = { slice: () => query.modules(filter).toArray(), members: [] };
+          moduleBuckets.set(key, bucket);
+        }
+        bucket.members.push({
+          run,
+          visit: moduleSpec.visit as (m: ModuleNode, c: RuleContext<unknown>) => void,
+        });
+      } catch (err) {
+        markFailed(run, err, diagnostics);
+      }
+    }
+  }
+
+  const drain = <T>(buckets: Map<string, Bucket<T>>): void => {
+    for (const bucket of buckets.values()) {
+      const items = bucket.slice();
+      for (const { run, visit } of bucket.members) {
+        if (run.failed) continue;
+        const startedRule = performance.now();
+        try {
+          for (const item of items) visit(item, run.ctx);
+        } catch (err) {
+          markFailed(run, err, diagnostics);
+        }
+        run.info.durationMs += performance.now() - startedRule;
+      }
+    }
+  };
+
+  drain(edgeBuckets);
+  drain(moduleBuckets);
+}
+
+function markFailed(run: RuleRun, err: unknown, diagnostics: Diagnostic[]): void {
+  run.failed = true;
+  run.info.status = "failed";
+  diagnostics.push({
+    code: "rule-failed",
+    severity: "error",
+    ruleId: run.resolved.id,
+    message: `Rule "${run.resolved.id}" threw and produced no results: ${err instanceof Error ? err.message : String(err)}`,
+    ...(err instanceof Error && err.stack !== undefined ? { details: { stack: err.stack } } : {}),
+  });
+}
+
+/**
+ * The instance's message templates over the rule's own.
+ *
+ * A bare string retargets a single-message rule; a record retargets by id. Anything the
+ * instance does not mention keeps the rule's wording.
+ */
+function messageTemplates(
+  own: Record<string, string> | undefined,
+  override: string | Record<string, string> | undefined,
+): Record<string, string> {
+  const base = { ...(own ?? {}) };
+  if (override === undefined) return base;
+  if (typeof override === "string") {
+    const ids = Object.keys(base);
+    // One message: unambiguous. Several: retarget them all, since the user asked for one
+    // sentence and getting it on only an arbitrary one of them would be worse.
+    for (const id of ids.length > 0 ? ids : ["default"]) base[id] = override;
+    return base;
+  }
+  return { ...base, ...override };
+}
+
+/**
  * Resolves a {@link RuleScope} to the concrete set of modules a scoped rule is about.
  *
  * Path patterns are matched source-root-relative — the same base `include`/`exclude` and
- * classifier patterns use, so one mental model covers all of them. A module with no file
- * (a builtin, a virtual module) can never be *in* a path scope, but it remains reachable
- * as an edge target, which is where a scoped rule actually needs to see it.
+ * classifier patterns use. A module with no file (a builtin, a virtual module) can never be
+ * *in* a path scope, but it remains reachable as an edge target, which is where a scoped
+ * rule actually needs to see it.
  */
 function modulesInScope(graph: ProjectGraph, scope: RuleScope, sourceRoot: string): Set<ModuleId> {
   const ids = new Set<ModuleId>();
-  for (const m of graph.modules.values()) {
+  for (const m of graph.modules()) {
     if (scope.tag !== undefined) {
       const ok = Object.entries(scope.tag).every(([k, v]) => m.tags.get(k) === v);
       if (!ok) continue;
     }
     if (scope.include !== undefined || scope.exclude !== undefined) {
       if (m.file === null) continue;
-      const rel = path.relative(sourceRoot, m.file.replaceAll("\\", "/")).replaceAll("\\", "/");
-      if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) continue;
+      const rel = sourceRelative(sourceRoot, m.file);
+      if (rel === null) continue;
       if (scope.include !== undefined && !scope.include.some((p) => matchesPattern(rel, p)))
         continue;
       if (scope.exclude !== undefined && scope.exclude.some((p) => matchesPattern(rel, p)))
@@ -228,13 +391,13 @@ function modulesInScope(graph: ProjectGraph, scope: RuleScope, sourceRoot: strin
 /**
  * The tool's most dangerous property is that its failure mode is *silence*: every rule
  * ignores modules it cannot classify, so a misconfigured `sourceRoot` tags nothing, matches
- * nothing, reports nothing, and passes. These diagnostics are the difference between
- * "your architecture is clean" and "ArchWall never looked at your code".
+ * nothing, reports nothing, and passes. These diagnostics are the difference between "your
+ * architecture is clean" and "ArchWall never looked at your code".
  */
 function auditClassification(graph: ProjectGraph): Diagnostic[] {
   let source = 0;
   let tagged = 0;
-  for (const m of graph.modules.values()) {
+  for (const m of graph.modules()) {
     if (m.kind !== "source") continue;
     source++;
     if (m.tags.size > 0) tagged++;

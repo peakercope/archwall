@@ -6,10 +6,9 @@ import type {
   ModuleId,
   ModuleKind,
   ModuleNode,
-  ProjectGraph,
   SourceLocation,
 } from "@archwall/core";
-import { IR_VERSION, isFirstParty } from "@archwall/core";
+import { isFirstParty, ProjectGraph } from "@archwall/core";
 
 export interface FixtureModule {
   id: string;
@@ -39,7 +38,7 @@ export interface FixtureGraphOptions {
   modules: (FixtureModule | string)[];
   /** Tuple ⇒ `{ from, to }`. */
   edges?: ([string, string] | FixtureEdge)[];
-  /** Default: all four capabilities. */
+  /** Default: all capabilities. */
   capabilities?: Capability[];
   delivery?: GraphDelivery;
   hostName?: string;
@@ -78,8 +77,7 @@ export function buildFixtureGraph(opts: FixtureGraphOptions): ProjectGraph {
       ...(e.loc !== undefined ? { loc: e.loc } : {}),
     };
   });
-  return {
-    irVersion: IR_VERSION,
+  return ProjectGraph.create({
     host: {
       name: opts.hostName ?? "test",
       version: "0.0.0",
@@ -88,5 +86,5 @@ export function buildFixtureGraph(opts: FixtureGraphOptions): ProjectGraph {
     delivery: opts.delivery ?? "complete",
     modules,
     edges,
-  };
+  });
 }

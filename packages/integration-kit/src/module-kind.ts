@@ -7,14 +7,11 @@ import { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
 /**
  * The single definition of what a module *is*.
  *
- * This decision used to be made independently three times — `vite/src/index.ts`,
- * `rspack/src/extract.ts`, and inline in `cli/src/scan.ts` — with only
- * `isBuiltinSpecifier` and `packageNameFromPath` shared. The *facts* differ per host and
- * always will; the *policy* must not, and three copies of a policy is how they came to
- * disagree about `workspace`: only the CLI ever emitted that kind, so a rule written
- * against it fired under the CLI and silently enforced nothing under all three bundlers.
+ * The *facts* differ per host and always will; the *policy* must not. Adapters supply only
+ * what their host actually knows, and this decides what it adds up to — so a rule about
+ * `workspace` modules means the same thing under every producer.
  *
- * Adapters now supply only what their host actually knows, and this decides.
+ * See docs/adr/0010-module-kind-not-external-boolean.md.
  */
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/;

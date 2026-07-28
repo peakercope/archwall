@@ -3,16 +3,15 @@ import picomatch from "picomatch";
 /**
  * Pattern matching, on ONE engine.
  *
- * This file used to open with "The one glob engine" while being one of two: `include`,
- * `exclude`, and the CLI scanner ran on picomatch, and overrides, `pathClassifier`, and
- * specifier matching ran on the hand-rolled compiler below. The two had different syntax —
- * brace alternation `{ts,tsx}` worked in `exclude` and silently failed in a classifier
- * pattern — so the comment was not merely stale, it actively misled.
+ * Matching is picomatch, everywhere — `include`/`exclude`, `overrides` keys,
+ * `pathClassifier` patterns, specifier patterns, and the CLI scanner. One engine, so brace
+ * alternation and every other piece of syntax means the same thing wherever a pattern
+ * appears.
  *
- * Matching is now picomatch everywhere. What remains here is the one thing picomatch does
- * not do: `:name` SEGMENT CAPTURES, which is how `pathClassifier` turns a path into tags
- * (`:layer/:slice/**` → `{ layer, slice }`). That is a different job from matching, not a
- * second dialect of it, and it is built by translating captures into a regex once.
+ * What lives here is the one thing picomatch does not do: `:name` SEGMENT CAPTURES, which
+ * is how `pathClassifier` turns a path into tags (`:layer/:slice/**` → `{ layer, slice }`).
+ * That is a different job from matching, not a second dialect of it, and it is built by
+ * translating captures into a regex once.
  *
  * Syntax, anchored full-match:
  *   *       matches within one segment (no "/")

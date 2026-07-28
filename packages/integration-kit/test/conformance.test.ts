@@ -8,15 +8,22 @@ import { describe, expect, it } from "vitest";
 
 const v = (rule: string, from: string, to: string): Violation => ({
   ruleName: rule,
+  ruleId: rule,
   severity: "error",
   message: "m",
-  edge: {
-    from: `/root/${from}`,
-    to: `/root/${to}`,
-    rawSpecifier: to,
-    resolvedPath: `/root/${to}`,
-    kind: "static",
-  },
+  fingerprint: `aw2:${rule}`,
+  locations: [
+    {
+      type: "edge",
+      edge: {
+        from: `/root/${from}`,
+        to: `/root/${to}`,
+        rawSpecifier: to,
+        resolvedPath: `/root/${to}`,
+        kind: "static",
+      },
+    },
+  ],
 });
 
 describe("assertViolationsMatch", () => {
@@ -98,15 +105,22 @@ describe("external identity in expectations", () => {
   it("compares an external target by package name, not by its path in node_modules", () => {
     const violation: Violation = {
       ruleName: "forbidden-dependencies",
+      ruleId: "forbidden-dependencies",
       severity: "error",
       message: "m",
-      edge: {
-        from: "/root/domain/rules.ts",
-        to: "/root/../node_modules/react/index.js",
-        rawSpecifier: "react",
-        resolvedPath: "/root/../node_modules/react/index.js",
-        kind: "static",
-      },
+      fingerprint: "aw2:x",
+      locations: [
+        {
+          type: "edge",
+          edge: {
+            from: "/root/domain/rules.ts",
+            to: "/root/../node_modules/react/index.js",
+            rawSpecifier: "react",
+            resolvedPath: "/root/../node_modules/react/index.js",
+            kind: "static",
+          },
+        },
+      ],
     };
     expect(() =>
       assertViolationsMatch([violation], "/root", [

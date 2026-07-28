@@ -21,11 +21,11 @@ describe("buildGraphFromFilesystem", () => {
     const g = await buildGraphFromFilesystem(config, cliHost());
     const cart = path.join(srcRoot, "features/cart/model/cart.ts");
     const store = path.join(srcRoot, "features/auth/model/store.ts");
-    const deep = g.edges.find((e) => e.from === cart && e.to === store);
+    const deep = g.edges().find((e) => e.from === cart && e.to === store);
     expect(deep).toBeDefined();
     expect(deep!.rawSpecifier).toBe("@/features/auth/model/store");
     expect(deep!.loc?.line).toBe(1);
-    const reexport = g.edges.find((e) => e.from === path.join(srcRoot, "features/auth/index.ts"));
+    const reexport = g.edges().find((e) => e.from === path.join(srcRoot, "features/auth/index.ts"));
     expect(reexport!.kind).toBe("reexport");
     expect(g.delivery).toBe("complete");
   });

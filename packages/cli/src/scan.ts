@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EdgeKind, HostInfo, ProjectGraph, ResolvedConfig } from "@archwall/core";
+import { sourceRelative } from "@archwall/core";
 import {
   createModuleKindResolver,
   GraphBuilder,
@@ -83,7 +84,10 @@ export async function buildGraphFromFilesystem(
     absolute: true,
   });
   const files = found
-    .filter((f) => matchesInclude(path.relative(config.sourceRoot, f).replaceAll("\\", "/")))
+    .filter((f) => {
+      const rel = sourceRelative(config.sourceRoot, f);
+      return rel !== null && matchesInclude(rel);
+    })
     .sort();
   const tsconfigPath = findTsconfig(config.sourceRoot);
   const resolver = new ResolverFactory({

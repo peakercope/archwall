@@ -3,7 +3,6 @@ import type {
   GraphDelivery,
   ModuleKind,
   ModuleNode,
-  ProjectGraph,
   StandardSchemaV1,
 } from "@archwall/core";
 import {
@@ -13,6 +12,7 @@ import {
   defineRule,
   IR_VERSION,
   IrVersionMismatchError,
+  ProjectGraph,
   resolveConfig,
   THIRD_PARTY_KINDS,
 } from "@archwall/core";
@@ -34,8 +34,7 @@ function graph(
   mods: ModuleNode[],
   opts: { capabilities?: Capability[]; delivery?: GraphDelivery } = {},
 ): ProjectGraph {
-  return {
-    irVersion: IR_VERSION,
+  return ProjectGraph.create({
     host: {
       name: "test",
       version: "0",
@@ -44,7 +43,7 @@ function graph(
     delivery: opts.delivery ?? "complete",
     modules: new Map(mods.map((m) => [m.id, m])),
     edges: [],
-  };
+  });
 }
 
 const flagExternals = defineRule({
@@ -69,7 +68,7 @@ describe("analyze", () => {
     expect(result.violations[0]).toMatchObject({
       ruleName: "flag-externals",
       severity: "warn",
-      module: "react",
+      locations: [{ type: "module", module: "react" }],
     });
     expect(result.stats.moduleCount).toBe(2);
   });

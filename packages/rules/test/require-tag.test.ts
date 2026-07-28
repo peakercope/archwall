@@ -1,3 +1,4 @@
+import { primaryModule } from "@archwall/core";
 import { requireTag } from "@archwall/rules";
 import { buildFixtureGraph, runRule } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
@@ -24,7 +25,7 @@ describe("require-tag", () => {
       { tag: "layer", within: ["src/**"] },
       { repoRoot: "/proj" },
     );
-    expect(v.map((x) => x.module)).toEqual(["/proj/src/vendor/hack.ts"]);
+    expect(v.map((x) => primaryModule(x))).toEqual(["/proj/src/vendor/hack.ts"]);
     expect(v[0]!.message).toContain("src/vendor/hack.ts");
   });
 
@@ -40,7 +41,7 @@ describe("require-tag", () => {
 
   it("defaults to the whole project and never reports externals", async () => {
     const v = await runRule(requireTag, graph, { tag: "layer" }, { repoRoot: "/proj" });
-    expect(v.map((x) => x.module).sort()).toEqual([
+    expect(v.map((x) => primaryModule(x)).sort()).toEqual([
       "/proj/scripts/build.ts",
       "/proj/src/vendor/hack.ts",
     ]);

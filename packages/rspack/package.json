@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@archwall/presets": "workspace:^",
-    "@rspack/core": "^2.1.5",
+    "@rspack/core": "^2.1.6",
     "@swc/core": "^1.15.46",
     "swc-loader": "^0.2.7",
     "webpack": "^5.109.1"

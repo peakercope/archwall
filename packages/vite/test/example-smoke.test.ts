@@ -18,10 +18,16 @@ const exampleDir = path.resolve(import.meta.dirname, "../../../examples/vite");
  */
 describe("examples/vite", () => {
   it("builds green under its own contract, with a non-empty graph", async () => {
+    // Reporters write through a ReporterIO sink, which under Node is `process.stdout`
+    // rather than `console.log` — that is what lets `--output` send a document to a file
+    // without the console reporter's commentary landing in it.
     const lines: string[] = [];
-    const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-      lines.push(args.join(" "));
-    });
+    const log = vi.spyOn(process.stdout, "write").mockImplementation(((
+      chunk: string | Uint8Array,
+    ) => {
+      lines.push(String(chunk).replace(/\n$/, ""));
+      return true;
+    }) as typeof process.stdout.write);
     try {
       await build({
         root: exampleDir,

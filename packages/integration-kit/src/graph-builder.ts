@@ -6,10 +6,9 @@ import type {
   ModuleId,
   ModuleKind,
   ModuleNode,
-  ProjectGraph,
   SourceLocation,
 } from "@archwall/core";
-import { ArchWallError, IR_VERSION, isFirstParty } from "@archwall/core";
+import { ArchWallError, isFirstParty, ProjectGraph } from "@archwall/core";
 import { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
 
 export interface GraphBuilderOptions {
@@ -132,12 +131,11 @@ export class GraphBuilder {
         });
       }
     }
-    return {
-      irVersion: IR_VERSION,
+    return ProjectGraph.create({
       host: this.#host,
       delivery: this.#delivery,
       modules,
       edges: [...this.#edges],
-    };
+    });
   }
 }

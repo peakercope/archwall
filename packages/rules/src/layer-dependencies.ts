@@ -15,24 +15,35 @@ export const layerDependencies = defineRule<LayerDependenciesOptions>({
     description:
       "Enforces an ordering over layer tags: modules may only depend on same or lower layers.",
     defaultSeverity: "error",
+    recommended: true,
     ...docsUrlFor("layer-dependencies"),
+    messages: {
+      higherLayer:
+        '"{from}" (layer "{fromLayer}") may not import from higher layer "{toLayer}" ("{to}")',
+    },
     optionsSchema: ruleOptions<LayerDependenciesOptions>(
       object({ layers: required(arrayOf(str)), tagKey: optional(str) }),
     ),
   },
-  check(ctx) {
-    const { layers, tagKey = "layer" } = ctx.options;
-    for (const e of ctx.graph.edges({ crossing: tagKey })) {
-      const fromLayer = ctx.graph.tagOf(e.from, tagKey)!;
-      const toLayer = ctx.graph.tagOf(e.to, tagKey)!;
-      const fi = layers.indexOf(fromLayer);
-      const ti = layers.indexOf(toLayer);
-      if (fi === -1 || ti === -1 || ti >= fi) continue;
-      ctx.report({
-        edge: e,
-        message: `"${e.from}" (layer "${fromLayer}") may not import from higher layer "${toLayer}" ("${e.to}")`,
-        explanation: `Configured layer order (highest first): ${layers.join(" → ")}. Modules may only import same or lower layers.`,
-      });
-    }
+  visits: {
+    edges: {
+      // Only edges that cross a layer boundary can violate an ordering over layers; the
+      // engine narrows to them once and shares the result with every rule wanting the same.
+      filter: (o) => ({ crossing: o.tagKey ?? "layer" }),
+      visit(e, ctx) {
+        const { layers, tagKey = "layer" } = ctx.options;
+        const fromLayer = ctx.graph.tagOf(e.from, tagKey)!;
+        const toLayer = ctx.graph.tagOf(e.to, tagKey)!;
+        const fi = layers.indexOf(fromLayer);
+        const ti = layers.indexOf(toLayer);
+        if (fi === -1 || ti === -1 || ti >= fi) return;
+        ctx.report({
+          edge: e,
+          messageId: "higherLayer",
+          data: { from: e.from, to: e.to, fromLayer, toLayer },
+          explanation: `Configured layer order (highest first): ${layers.join(" → ")}. Modules may only import same or lower layers.`,
+        });
+      },
+    },
   },
 });

@@ -21,7 +21,7 @@ describe("test-utils", () => {
         ["y", "z"],
       ],
     });
-    expect(g.modules.size).toBe(3);
+    expect(g.moduleCount).toBe(3);
     expect(g.host.capabilities.has("complete-graph")).toBe(true);
     const violations = await runRule(flagCross, g);
     expectViolations(violations, [{ rule: "flag-cross", from: "x", to: "y" }]);

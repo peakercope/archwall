@@ -1,7 +1,7 @@
 {
   "name": "@archwall/vite",
   "version": "0.0.0",
-  "description": "Vite adapter for ArchWall: validates the real module graph during dev and build.",
+  "description": "Vite adapter for ArchWall: the Rollup adapter in build, plus progressive dev-mode analysis.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,7 +17,8 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@archwall/integration-kit": "workspace:^"
+    "@archwall/integration-kit": "workspace:^",
+    "@archwall/rollup": "workspace:^"
   },
   "peerDependencies": {
     "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"

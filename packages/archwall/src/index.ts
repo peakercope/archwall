@@ -54,10 +54,9 @@ export type {
 /**
  * The built-in rules, for the very common case of adding one alongside a preset.
  *
- * The umbrella claims 95% of users touch only this package, and yet the README's own
- * second example imported `defineConfig` from `archwall` and `noCycles` from
- * `@archwall/rules` in adjacent lines. Either the claim or the surface was wrong; the
- * surface was.
+ * This package is meant to be the only one most users import, so anything a config file
+ * routinely reaches for belongs here — otherwise a single config ends up importing from
+ * `archwall` and `@archwall/rules` in adjacent lines.
  */
 export {
   featureIsolation,

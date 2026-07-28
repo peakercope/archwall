@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { check } from "@archwall/cli";
 import type { Preset, Reporter, UserConfig, Violation } from "@archwall/core";
-import { packageNameFromPath } from "@archwall/integration-kit";
+import { packageNameFromPath, primaryEdge, primaryModule } from "@archwall/integration-kit";
 import { fsd, layered, modules } from "@archwall/presets";
 import ArchWallPlugin from "@archwall/rspack";
 import archwallVite from "@archwall/vite";
@@ -15,11 +15,14 @@ function normalize(srcRoot: string) {
     packageNameFromPath(p) ?? path.relative(srcRoot, p).replaceAll("\\", "/");
   return (vs: readonly Violation[]) =>
     vs
-      .map((v) =>
-        [v.ruleId, v.edge ? at(v.edge.from) : (v.module ?? ""), v.edge ? at(v.edge.to) : ""].join(
-          "|",
-        ),
-      )
+      .map((v) => {
+        const edge = primaryEdge(v);
+        return [
+          v.ruleId,
+          edge ? at(edge.from) : (primaryModule(v) ?? ""),
+          edge ? at(edge.to) : "",
+        ].join("|");
+      })
       .sort();
 }
 

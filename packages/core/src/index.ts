@@ -6,10 +6,14 @@ export type {
   BuiltinReporterName,
   FailOn,
   FailOnDiagnostics,
+  PresetSpec,
+  ReporterOutputSpec,
+  ReporterSpec,
   ResolvedConfig,
   ResolvedFailOnDiagnostics,
   ResolvedRule,
   RuleOverride,
+  RuleSpec,
   UserConfig,
 } from "./config.js";
 export { defineConfig, resolveConfig } from "./config.js";
@@ -34,7 +38,10 @@ export { definePreset } from "./contracts/preset.js";
 export type {
   AnalysisResult,
   AnalysisStats,
+  OutputDestination,
+  OutputSink,
   Reporter,
+  ReporterIO,
   RuleRunInfo,
   RunInfo,
 } from "./contracts/reporter.js";
@@ -44,9 +51,11 @@ export type {
   ConfiguredRule,
   Rule,
   RuleContext,
+  RuleDeprecation,
   RuleMeta,
   RuleScope,
   RuleSettings,
+  RuleVisitors,
 } from "./contracts/rule.js";
 export { configureRule, defineRule } from "./contracts/rule.js";
 export type {
@@ -60,19 +69,20 @@ export type {
 } from "./contracts/transform.js";
 export { defineTransform } from "./contracts/transform.js";
 export { analyze } from "./engine/analyze.js";
-export { applyProjectBoundary } from "./engine/boundary.js";
-export { applyClassifiers } from "./engine/classify.js";
+export type { BoundaryConfig, PrepareConfig, PrepareResult } from "./engine/prepare.js";
+export { applyProjectBoundary, prepareGraph } from "./engine/prepare.js";
 export { ArchWallError, IrVersionMismatchError } from "./errors.js";
 export type {
   Capability,
   Edge,
   EdgeKind,
   GraphDelivery,
+  GraphMutation,
   HostInfo,
   ModuleId,
   ModuleKind,
   ModuleNode,
-  ProjectGraph,
+  ProjectGraphInit,
   SourceLocation,
   WellKnownCapability,
   WellKnownEdgeKind,
@@ -84,20 +94,25 @@ export {
   irMajor,
   isFirstParty,
   isThirdParty,
+  ProjectGraph,
   THIRD_PARTY_KINDS,
 } from "./graph/ir.js";
-export type { EdgeFilter, ModuleFilter } from "./graph/query.js";
-export { GraphQuery, ModuleSelection } from "./graph/query.js";
+export type { EdgeFilter, ModuleFilter, ModuleSelection } from "./graph/query.js";
+export { filterKey, GraphIndex, GraphQuery } from "./graph/query.js";
 export { matchCaptures, matchesPattern } from "./match.js";
-export { stableHash, toRelative } from "./paths.js";
-export type { ReporterIO } from "./reporters/console.js";
+export { hashParts, sourceRelative, stableHash, toRelative } from "./paths.js";
 export {
   consoleReporter,
   defaultIO,
   formatViolation,
 } from "./reporters/console.js";
 export { jsonReporter } from "./reporters/json.js";
-export { resolveReporters } from "./reporters/resolve.js";
+export type { ResolvedReporters } from "./reporters/resolve.js";
+export {
+  BUILTIN_REPORTER_NAMES,
+  isBuiltinReporterName,
+  resolveReporters,
+} from "./reporters/resolve.js";
 export { sarifReporter } from "./reporters/sarif.js";
 export { dropSelfEdges } from "./transforms/drop-self-edges.js";
 export type {
@@ -105,10 +120,16 @@ export type {
   SeverityCounts,
   Violation,
   ViolationInput,
+  ViolationLocation,
 } from "./violations.js";
 export {
   compareViolations,
   countBySeverity,
   FINGERPRINT_SCHEME,
   fingerprintOf,
+  locationsOf,
+  primaryEdge,
+  primaryModule,
+  primarySourceLocation,
+  renderMessage,
 } from "./violations.js";

@@ -2,22 +2,23 @@ import * as path from "node:path";
 import type { Classifier } from "./contracts/classifier.js";
 import type { Diagnostic } from "./contracts/diagnostic.js";
 import type { Preset } from "./contracts/preset.js";
-import type { Reporter } from "./contracts/reporter.js";
-import type { ConfiguredRule, Rule, RuleScope } from "./contracts/rule.js";
+import type { AnyConfiguredRule, Rule, RuleScope, RuleSettings } from "./contracts/rule.js";
 import type { GraphTransform } from "./contracts/transform.js";
-import { ArchWallError } from "./errors.js";
 import { matchesPattern } from "./match.js";
+import type { ReporterSpec } from "./reporters/resolve.js";
+import { BUILTIN_REPORTER_NAMES, isBuiltinReporterName } from "./reporters/resolve.js";
 import type { Severity } from "./violations.js";
 
 export type FailOn = "error" | "warn" | "never";
-export type BuiltinReporterName = "console" | "json" | "sarif";
+export type { BuiltinReporterName, ReporterOutputSpec, ReporterSpec } from "./reporters/resolve.js";
 
 /**
  * Which diagnostics are severe enough to fail the run, independently of violations.
  *
- * `rule-failed` defaults to true and should stay that way: a rule that throws produces no
- * results, so a run in which one crashed is a run that did not check what you asked it to.
- * An enforcement tool that passes green when a rule crashes is not an enforcement tool.
+ * `ruleFailed` and `invalidConfig` default to true and should stay that way: a rule that
+ * throws, and a rule dropped because its configuration was invalid, both produce no results
+ * — so a run in which either happened is a run that did not check what you asked it to. An
+ * enforcement tool that passes green when a rule crashes is not an enforcement tool.
  */
 export interface FailOnDiagnostics {
   /** A rule threw. Default true. */
@@ -28,6 +29,10 @@ export interface FailOnDiagnostics {
   emptyAnalysis?: boolean;
   /** A rule's options failed its schema, so the rule did not run. Default true. */
   invalidOptions?: boolean;
+  /** The configuration itself is wrong and something was dropped. Default true. */
+  invalidConfig?: boolean;
+  /** A configured rule is deprecated. Default false. */
+  deprecated?: boolean;
 }
 
 export interface ResolvedFailOnDiagnostics {
@@ -35,15 +40,16 @@ export interface ResolvedFailOnDiagnostics {
   ruleSkipped: boolean;
   emptyAnalysis: boolean;
   invalidOptions: boolean;
+  invalidConfig: boolean;
+  deprecated: boolean;
 }
 
 /**
- * Retune one rule instance. The shorthand form sets severity only; the object form can
- * also patch options.
+ * Retune one rule instance. The shorthand form sets severity only; the object form can also
+ * patch options, scope, and wording.
  *
  * Options merge by ONE policy, the same one used everywhere: **top-level keys replace, and
- * arrays are replaced wholesale, never concatenated.** So `options: { layers: ["a", "b"] }`
- * gives the rule exactly that layer order — it does not append to the preset's.
+ * arrays are replaced wholesale, never concatenated.**
  */
 export type RuleOverride =
   | Severity
@@ -52,58 +58,83 @@ export type RuleOverride =
       severity?: Severity | "off";
       options?: Record<string, unknown>;
       scope?: RuleScope;
+      message?: string | Record<string, string>;
     };
+
+/**
+ * A preset, or the name of a package exporting one.
+ *
+ * The string form is what makes a plugin ecosystem possible: without it a preset can only
+ * be `import`ed, which forecloses JSON/YAML configuration and any `--preset` flag forever.
+ * Strings are resolved by the config loader (`@archwall/integration-kit`), which is the
+ * layer that has a module resolver; one that reaches {@link resolveConfig} unresolved is
+ * reported as a configuration error rather than silently ignored.
+ *
+ * `["@acme/preset", { … }]` calls the package's default export with those options.
+ */
+export type PresetSpec = Preset | string | readonly [string, Record<string, unknown>?];
+
+/** A configured rule, or the name of a package/built-in exporting one. See {@link PresetSpec}. */
+export type RuleSpec =
+  | AnyConfiguredRule
+  | string
+  | readonly [string, Record<string, unknown>?, RuleSettings?];
 
 export interface UserConfig {
   /**
+   * Configurations to inherit from, nearest-last: a later entry wins over an earlier one,
+   * and this config wins over all of them.
+   *
+   * Arrays (`presets`, `rules`, `classifiers`, `transforms`, `reporters`, `exclude`)
+   * CONCATENATE base-first, because rules already merge by instance id downstream and
+   * `overrides` already exists for retuning. Scalars replace. `overrides` merges key-wise.
+   *
+   * This is the only way to ship an organisation-wide configuration: a `Preset` cannot set
+   * `failOn`, `include`, `exclude`, `repoRoot`, or `reporters`, so without `extends` a
+   * shared config is a preset plus a README telling every repository to copy twenty lines.
+   */
+  extends?: string | string[];
+  /**
    * Where the *repository* starts, relative to the config file / cwd. Default ".".
    *
-   * This is the base for everything that leaves the process — reporter output, SARIF
-   * `artifactLocation.uri`, violation fingerprints — so it must be the path a checkout
-   * is rooted at, not the path your sources happen to live under. Pointing it at `src/`
-   * emits `features/x.ts` where consumers expect `src/features/x.ts`, and GitHub code
-   * scanning cannot associate that with a file in the repository.
+   * The base for everything that leaves the process — reporter output, SARIF
+   * `artifactLocation.uri`, violation fingerprints — so it must be the path a checkout is
+   * rooted at, not the path your sources happen to live under.
    */
   repoRoot?: string;
   /**
    * Where the *sources* start, relative to {@link repoRoot}. Default ".".
    *
-   * This is the base for `include`/`exclude` matching and for `pathClassifier` patterns
-   * — i.e. the tree whose shape your architecture is described in. This is the one that
-   * is usually `"src"`.
+   * The base for `include`/`exclude` matching and for classifier patterns — the tree whose
+   * shape your architecture is described in. This is the one that is usually `"src"`.
    */
   sourceRoot?: string;
   include?: string[];
   /**
    * Patterns ADDED to the defaults (`node_modules`, `*.test.*`, `*.spec.*`), not a
-   * replacement for them.
-   *
-   * Replacing was the old behaviour and a classic trap: `exclude: ["**\/*.stories.*"]`
-   * silently re-admitted every test file, and the resulting violations looked like a
-   * change in your architecture rather than in your config. Use {@link excludeDefaults}
-   * to opt out of the defaults deliberately.
+   * replacement for them. Use {@link excludeDefaults} to opt out deliberately.
    */
   exclude?: string[];
-  /**
-   * Set false to drop the built-in `exclude` defaults entirely. Opting out is fine; doing
-   * it by accident is not, which is why it takes a second field to say so.
-   */
+  /** Set false to drop the built-in `exclude` defaults entirely. */
   excludeDefaults?: boolean;
-  presets?: Preset[];
+  presets?: PresetSpec[];
   /** Appended after preset classifiers. */
   classifiers?: Classifier[];
   /** Appended after preset transforms; run between the project boundary and classification. */
   transforms?: GraphTransform[];
   /** Merged after preset rules (last-writer-wins, keyed by rule instance id). */
-  rules?: ConfiguredRule[];
+  rules?: RuleSpec[];
   /**
-   * Retunes rule instances; ALWAYS wins over presets and rules. Keys are an exact
-   * instance id ("fsd/public-api"), a bare rule name (every instance of it), or a glob
-   * ("fsd/*"). A key that matches no rule is an error, not a silent no-op.
+   * Retunes rule instances; ALWAYS wins over presets and rules. Keys are an exact instance
+   * id ("fsd/public-api"), a bare rule name (every instance of it), or a glob ("fsd/*").
+   * A key that matches no rule is an error, not a silent no-op.
    */
   overrides?: Record<string, RuleOverride>;
-  /** Built-ins by name; customs by object. Default ["console"]. */
-  reporters?: (BuiltinReporterName | Reporter)[];
+  /**
+   * Built-ins by name, customs by object, third-party by package name, and
+   * `{ reporter, output }` to send one somewhere other than stdout. Default ["console"].
+   */
+  reporters?: ReporterSpec[];
   /** Which VIOLATION severity gates the run. `info` findings never fail it. */
   failOn?: FailOn;
   /** Which DIAGNOSTICS gate the run, regardless of `failOn`. */
@@ -122,6 +153,8 @@ export interface ResolvedRule {
   severity: Severity;
   /** Narrows the graph this instance sees; applied by the engine, never by the rule. */
   scope?: RuleScope;
+  /** Per-instance message templates. */
+  message?: string | Record<string, string>;
 }
 
 export interface ResolvedConfig {
@@ -135,76 +168,104 @@ export interface ResolvedConfig {
   transforms: readonly GraphTransform[];
   rules: readonly ResolvedRule[];
   /** Reporter instantiation is deferred to the run edge (resolveReporters). */
-  reporterSpecs: readonly (BuiltinReporterName | Reporter)[];
+  reporterSpecs: readonly ReporterSpec[];
   failOn: FailOn;
   failOnDiagnostics: ResolvedFailOnDiagnostics;
   /**
-   * Everything wrong with the configuration itself, found before any graph work. The
-   * engine forwards these into `AnalysisResult.diagnostics` so they reach reporters and
-   * the exit status through the one channel every other diagnostic uses.
+   * Everything wrong with the configuration itself, found before any graph work.
+   *
+   * Reported rather than thrown: a throw inside a bundler's `buildEnd` produces a stack
+   * trace and destroys every other finding in the run. One mistyped `overrides` key costs
+   * you that key, not the analysis — and `failOnDiagnostics.invalidConfig` still fails the
+   * run. See docs/adr/0007-config-errors-as-diagnostics.md.
    */
   diagnostics: readonly Diagnostic[];
 }
 
 /**
- * Everything under `root`, deliberately — NOT an extension allow-list.
+ * Everything under `sourceRoot`, deliberately — NOT an extension allow-list.
  *
- * `include`/`exclude` describe the shape of your project and are applied to the graph,
- * where the compiler has already decided what counts as a module. Re-filtering by
- * extension there would silently drop every `.vue`, `.svelte`, `.astro`, and `.mts`
- * module the host legitimately compiled.
- *
- * Deciding *which files to open and parse* is a different question, and it belongs to
- * the one surface that enumerates a directory tree rather than reading a graph: the
+ * `include`/`exclude` are applied to the graph, where the compiler has already decided what
+ * counts as a module. Re-filtering by extension there would silently drop every `.vue`,
+ * `.svelte`, `.astro`, and `.mts` module the host legitimately compiled. Deciding *which
+ * files to open and parse* belongs to the one surface that enumerates a directory tree: the
  * CLI's scanner keeps its own list of extensions it can lex.
  */
 const DEFAULT_INCLUDE = ["**"];
 const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/*.test.*", "**/*.spec.*"];
 
+function configError(message: string, ruleId?: string): Diagnostic {
+  return {
+    code: "invalid-config",
+    severity: "error",
+    ...(ruleId !== undefined ? { ruleId } : {}),
+    message,
+  };
+}
+
+interface IdentifiedRule {
+  configured: AnyConfiguredRule;
+  id: string;
+}
+
 /**
- * Namespacing preset rules is what makes `presets: [a(), b()]` safe: without it two
- * presets configuring the same rule would collide on one key and shallow-merge their
- * options, silently overwriting each other's layer lists.
+ * Namespacing preset rules is what makes `presets: [a(), b()]` safe: without it two presets
+ * configuring the same rule collide on one key and shallow-merge their options.
+ *
+ * …which only works if the names are actually distinct. Two instances of one preset — the
+ * natural way to describe a monorepo — would produce identical ids, the same collision
+ * arrived at from the other direction, so a duplicate name is reported and the later preset
+ * is namespaced apart rather than silently merged.
  */
-function withIds(presets: readonly Preset[], userRules: readonly ConfiguredRule[]) {
-  // …which namespacing only achieves if the names are actually distinct. Two instances of
-  // one preset — `presets: [fsd(), fsd({ src: "packages/b" })]`, the natural way to describe
-  // a monorepo — produce identical ids and shallow-merge their options, which is exactly the
-  // collision namespacing exists to prevent, arrived at from the other direction.
-  const seen = new Set<string>();
+function withIds(
+  presets: readonly Preset[],
+  userRules: readonly AnyConfiguredRule[],
+  diagnostics: Diagnostic[],
+): IdentifiedRule[] {
+  const namespaces = new Map<string, number>();
+  const preset: IdentifiedRule[] = [];
   for (const p of presets) {
-    if (seen.has(p.name)) {
-      throw new ArchWallError(
-        `Two presets are both named "${p.name}", so their rules would collide on the same ids and ` +
-          `silently merge their options. Give one a distinct name (presets accept a \`name\` via ` +
-          `\`definePreset\`), or configure the second one's rules explicitly with their own \`id\`s.`,
+    const seen = namespaces.get(p.name) ?? 0;
+    namespaces.set(p.name, seen + 1);
+    let namespace = p.name;
+    if (seen > 0) {
+      namespace = `${p.name}#${seen + 1}`;
+      diagnostics.push(
+        configError(
+          `Two presets are both named "${p.name}", so their rules would collide on the same ids and ` +
+            `silently merge their options. The later one's rules were namespaced "${namespace}/…" instead. ` +
+            `Give it a distinct name, or configure its rules explicitly with their own \`id\`s.`,
+        ),
       );
     }
-    seen.add(p.name);
+    for (const r of p.rules) {
+      preset.push({ configured: r, id: r.id ?? `${namespace}/${r.rule.meta.name}` });
+    }
   }
 
-  const preset = presets.flatMap((p) =>
-    p.rules.map((r) => ({
-      configured: r,
-      id: r.id ?? `${p.name}/${r.rule.meta.name}`,
-    })),
-  );
-
-  const own = userRules.map((r) => {
-    if (r.id !== undefined) return { configured: r, id: r.id };
-    const name = r.rule.meta.name;
-    // A bare user rule tunes the preset's instance rather than adding a second one —
-    // two instances of the same rule would report every violation twice.
-    const fromPresets = preset.filter((p) => p.configured.rule.meta.name === name);
-    if (fromPresets.length === 1) return { configured: r, id: fromPresets[0]!.id };
-    if (fromPresets.length > 1) {
-      throw new ArchWallError(
-        `Rule "${name}" is configured by more than one preset (${fromPresets.map((p) => p.id).join(", ")}), ` +
-          `so a bare rules[] entry is ambiguous. Give the entry an explicit \`id\`, or use \`overrides\` to target one.`,
-      );
+  const own: IdentifiedRule[] = [];
+  for (const r of userRules) {
+    if (r.id !== undefined) {
+      own.push({ configured: r, id: r.id });
+      continue;
     }
-    return { configured: r, id: name };
-  });
+    const name = r.rule.meta.name;
+    // A bare user rule tunes the preset's instance rather than adding a second one — two
+    // instances of the same rule would report every violation twice.
+    const fromPresets = preset.filter((p) => p.configured.rule.meta.name === name);
+    if (fromPresets.length === 1) {
+      own.push({ configured: r, id: fromPresets[0]!.id });
+    } else if (fromPresets.length > 1) {
+      diagnostics.push(
+        configError(
+          `Rule "${name}" is configured by more than one preset (${fromPresets.map((p) => p.id).join(", ")}), ` +
+            `so a bare rules[] entry is ambiguous and was dropped. Give it an explicit \`id\`, or use \`overrides\` to target one.`,
+        ),
+      );
+    } else {
+      own.push({ configured: r, id: name });
+    }
+  }
 
   return [...preset, ...own];
 }
@@ -214,11 +275,9 @@ function withIds(presets: readonly Preset[], userRules: readonly ConfiguredRule[
  * preset over preset, `rules[]` over preset, and `overrides.options` over both.
  *
  * **Top-level keys replace. Nothing is deep-merged, and arrays are never concatenated.**
- *
  * Arrays here are values, not collections: `layers: ["ui", "domain"]` describes a total
- * order and `forbid: [...]` a complete policy. Appending to either produces something the
- * author never wrote — a layer order with duplicates, or a forbid list you cannot shrink.
- * Replacement is the only rule that lets an override *remove* something.
+ * order and `forbid: [...]` a complete policy. Replacement is the only rule that lets an
+ * override *remove* something.
  */
 function mergeRuleOptions(
   base: Record<string, unknown> | undefined,
@@ -230,14 +289,12 @@ function mergeRuleOptions(
 /**
  * Validates one rule's options against its `optionsSchema`, at CONFIG time.
  *
- * This used to run inside the rule loop in `analyze()`, once per run, and it *threw* — from
- * a line that sat outside the per-rule `try/catch` two lines below it, so a schema failure
- * in rule 3 destroyed rules 4 through 40. A bad options bag is a configuration mistake: it
- * is known before any graph work happens, it cannot be fixed by re-running, and it should
- * be reported once, as a diagnostic, alongside every other thing wrong with the config.
+ * A bad options bag is a configuration mistake: it is known before any graph work happens,
+ * it cannot be fixed by re-running, and it should be reported once, as a diagnostic,
+ * alongside everything else wrong with the config.
  *
- * Schemas must validate synchronously here. An async schema is not rejected as invalid —
- * it is reported as unusable, which is a different and more accurate complaint.
+ * Schemas must validate synchronously. An async schema is not rejected as invalid — it is
+ * reported as unusable, which is a different and more accurate complaint.
  */
 function validateOptions(
   rule: Rule<any>,
@@ -275,35 +332,79 @@ function validateOptions(
   return { value: result.value };
 }
 
+/** Splits materialized entries from string specs the loader was supposed to resolve. */
+function materialized<T extends object, S>(
+  specs: readonly (T | S)[],
+  what: string,
+  diagnostics: Diagnostic[],
+): T[] {
+  const out: T[] = [];
+  for (const spec of specs) {
+    if (typeof spec === "string" || Array.isArray(spec)) {
+      const name = typeof spec === "string" ? spec : String((spec as unknown[])[0]);
+      diagnostics.push(
+        configError(
+          `${what} "${name}" was given as a name, but nothing resolved it to a module. ` +
+            `Named ${what.toLowerCase()}s are resolved when the config is loaded from a file; ` +
+            `if you are calling resolveConfig() directly, pass the imported object instead.`,
+        ),
+      );
+      continue;
+    }
+    out.push(spec as T);
+  }
+  return out;
+}
+
 export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): ResolvedConfig {
   const cwd = opts?.cwd ?? process.cwd();
-  const presets = user.presets ?? [];
+  const diagnostics: Diagnostic[] = [];
 
-  // `root` used to mean both roots at once, and the documented value ("./src") was right
-  // for one and wrong for the other. Silently reinterpreting it either way would change
-  // results without telling anyone, so it is an error with a migration in the message.
   if ("root" in user) {
-    throw new ArchWallError(
-      "`root` has been split into `repoRoot` (base for reported paths, SARIF, and fingerprints) " +
-        "and `sourceRoot` (base for include/exclude and classifier patterns). " +
-        'A config that used `root: "src"` almost certainly wants `sourceRoot: "src"` with `repoRoot` left at its default.',
+    diagnostics.push(
+      configError(
+        "`root` has been split into `repoRoot` (base for reported paths, SARIF, and fingerprints) " +
+          "and `sourceRoot` (base for include/exclude and classifier patterns). " +
+          'A config that used `root: "src"` almost certainly wants `sourceRoot: "src"` with `repoRoot` left at its default.',
+      ),
     );
   }
+  if (user.extends !== undefined) {
+    diagnostics.push(
+      configError(
+        "`extends` was not resolved. It is followed when the config is loaded from a file; " +
+          "resolveConfig() receives an already-flattened config.",
+      ),
+    );
+  }
+
+  const presets = materialized<Preset, string | readonly unknown[]>(
+    user.presets ?? [],
+    "Preset",
+    diagnostics,
+  );
+  const userRules = materialized<AnyConfiguredRule, string | readonly unknown[]>(
+    user.rules ?? [],
+    "Rule",
+    diagnostics,
+  );
 
   interface Entry {
     rule: Rule<any>;
     scope?: RuleScope;
     options: Record<string, unknown>;
     severity?: Severity | "off";
+    message?: string | Record<string, string>;
   }
   const merged = new Map<string, Entry>();
-  for (const { configured, id } of withIds(presets, user.rules ?? [])) {
+  for (const { configured, id } of withIds(presets, userRules, diagnostics)) {
     const prev = merged.get(id);
     const severity = configured.severity ?? prev?.severity;
     // Scope replaces rather than merges, for the same reason array options do: a scope is
-    // one complete description of where a rule applies, and a merged one is a place
-    // neither author asked for.
+    // one complete description of where a rule applies, and a merged one is a place neither
+    // author asked for.
     const scope = configured.scope ?? prev?.scope;
+    const message = configured.message ?? prev?.message;
     merged.set(id, {
       rule: configured.rule,
       options: mergeRuleOptions(
@@ -312,6 +413,7 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
       ),
       ...(severity !== undefined ? { severity } : {}),
       ...(scope !== undefined ? { scope } : {}),
+      ...(message !== undefined ? { message } : {}),
     });
   }
 
@@ -321,9 +423,12 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
     );
     if (targets.length === 0) {
       const known = [...merged.keys()].sort().join(", ");
-      throw new ArchWallError(
-        `Override key "${key}" matches no configured rule. Configured rules: ${known || "(none)"}.`,
+      diagnostics.push(
+        configError(
+          `Override key "${key}" matches no configured rule and was ignored. Configured rules: ${known || "(none)"}.`,
+        ),
       );
+      continue;
     }
     const patch = typeof override === "string" ? { severity: override } : override;
     for (const [, entry] of targets) {
@@ -331,11 +436,11 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
       if (patch.options !== undefined)
         entry.options = mergeRuleOptions(entry.options, patch.options);
       if (patch.scope !== undefined) entry.scope = patch.scope;
+      if (patch.message !== undefined) entry.message = patch.message;
     }
   }
 
   const rules: ResolvedRule[] = [];
-  const diagnostics: Diagnostic[] = [];
   for (const [id, entry] of merged) {
     const severity = entry.severity ?? entry.rule.meta.defaultSeverity;
     if (severity === "off") continue;
@@ -352,7 +457,31 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
       options: validated.value,
       severity,
       ...(entry.scope !== undefined ? { scope: entry.scope } : {}),
+      ...(entry.message !== undefined ? { message: entry.message } : {}),
     });
+  }
+
+  const reporterSpecs: ReporterSpec[] = [];
+  for (const spec of [
+    ...(user.reporters ?? ["console"]),
+    ...presets.flatMap((p) => p.reporters ?? []),
+  ]) {
+    const name =
+      typeof spec === "string"
+        ? spec
+        : typeof (spec as { reporter?: unknown }).reporter === "string"
+          ? (spec as { reporter: string }).reporter
+          : undefined;
+    if (name !== undefined && !isBuiltinReporterName(name)) {
+      diagnostics.push(
+        configError(
+          `Reporter "${name}" is not a built-in (${BUILTIN_REPORTER_NAMES.join(", ")}) and nothing resolved it ` +
+            `to a module, so it was dropped. Named reporters are resolved when the config is loaded from a file.`,
+        ),
+      );
+      continue;
+    }
+    reporterSpecs.push(spec);
   }
 
   const repoRoot = path.resolve(cwd, user.repoRoot ?? ".");
@@ -363,24 +492,21 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
     // resolving them independently would let them drift apart under a different cwd.
     sourceRoot: path.resolve(repoRoot, user.sourceRoot ?? "."),
     include: user.include ?? [...DEFAULT_INCLUDE],
-    // MERGED, not replaced. Adding one pattern must not silently re-admit node_modules
-    // and every test file in the project.
+    // MERGED, not replaced. Adding one pattern must not silently re-admit node_modules and
+    // every test file in the project.
     exclude: [...(user.excludeDefaults === false ? [] : DEFAULT_EXCLUDE), ...(user.exclude ?? [])],
     classifiers: [...presets.flatMap((p) => p.classifiers), ...(user.classifiers ?? [])],
     transforms: [...presets.flatMap((p) => p.transforms ?? []), ...(user.transforms ?? [])],
     rules,
-    // Preset reporters are APPENDED, never a replacement: a preset that ships an uploader
-    // must not silently remove the console output the user is actually reading.
-    reporterSpecs: [
-      ...(user.reporters ?? ["console"]),
-      ...presets.flatMap((p) => p.reporters ?? []),
-    ],
+    reporterSpecs,
     failOn: user.failOn ?? "error",
     failOnDiagnostics: {
       ruleFailed: user.failOnDiagnostics?.ruleFailed ?? true,
       ruleSkipped: user.failOnDiagnostics?.ruleSkipped ?? false,
       emptyAnalysis: user.failOnDiagnostics?.emptyAnalysis ?? false,
       invalidOptions: user.failOnDiagnostics?.invalidOptions ?? true,
+      invalidConfig: user.failOnDiagnostics?.invalidConfig ?? true,
+      deprecated: user.failOnDiagnostics?.deprecated ?? false,
     },
     diagnostics,
   };

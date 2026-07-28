@@ -1,19 +1,7 @@
 import type { Capability } from "../graph/ir.js";
 import type { Severity } from "../violations.js";
 
-/**
- * Everything the run wants to say that is *not* a violation of the user's architecture:
- * a rule that could not run, a rule that crashed, a configuration that looks wrong.
- *
- * This exists as a first-class channel because the alternative is what the engine used
- * to do — one hardcoded `skippedRules` array for the single case that had come up, and
- * an exception for everything else. An exception is the wrong shape for "one of your
- * forty rules is broken": it destroys the other thirty-nine results.
- */
-/**
- * Alias, kept only so existing imports keep working — it IS {@link Severity}. There used
- * to be two vocabularies here, one saying `warn` and one saying `warning`, for one concept.
- */
+/** Alias, for readability at use sites — it IS {@link Severity}. */
 export type DiagnosticSeverity = Severity;
 
 /**
@@ -25,17 +13,28 @@ export type WellKnownDiagnosticCode =
   | "rule-skipped"
   /** A rule threw. The run continued; that rule produced no results. */
   | "rule-failed"
-  /** Classification tagged nothing — almost always a misconfigured `root`. */
+  /** Classification tagged nothing — almost always a misconfigured `sourceRoot`. */
   | "no-modules-classified"
   /** The project boundary (`include`/`exclude`) matched no source modules. */
   | "empty-project"
   /** A rule's options failed its `optionsSchema` at config time; the rule did not run. */
   | "invalid-rule-options"
+  /** The configuration itself is wrong; see the message. The rule or preset was dropped. */
+  | "invalid-config"
+  /** A configured rule, or one of its options, is deprecated. */
+  | "rule-deprecated"
   /** A graph transform threw. The pipeline continued without its contribution. */
   | "transform-failed";
 
 export type DiagnosticCode = WellKnownDiagnosticCode | (string & {});
 
+/**
+ * Everything the run wants to say that is *not* a violation of the user's architecture: a
+ * rule that could not run, a rule that crashed, a configuration that looks wrong.
+ *
+ * A first-class channel because the alternative — an exception — is the wrong shape for
+ * "one of your forty rules is broken": it destroys the other thirty-nine results.
+ */
 export interface Diagnostic {
   code: DiagnosticCode;
   severity: DiagnosticSeverity;

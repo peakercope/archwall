@@ -1,4 +1,4 @@
-import { analyze, configureRule, defineRule, resolveConfig } from "@archwall/core";
+import { analyze, configureRule, defineRule, primaryModule, resolveConfig } from "@archwall/core";
 import { buildFixtureGraph } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
 
@@ -53,7 +53,7 @@ async function modulesSeenBy(scope?: {
       { cwd: "/repo" },
     ),
   );
-  return result.violations.map((v) => v.module).sort();
+  return result.violations.map((v) => primaryModule(v)).sort();
 }
 
 describe("rule scope", () => {
@@ -98,7 +98,7 @@ describe("rule scope", () => {
     const byId = (id: string) =>
       result.violations
         .filter((v) => v.ruleId === id)
-        .map((v) => v.module)
+        .map((v) => primaryModule(v))
         .sort();
     expect(byId("web")).toEqual(["/repo/apps/web/a.ts", "/repo/apps/web/b.ts"]);
     expect(byId("api")).toEqual(["/repo/services/api/x.ts", "/repo/services/api/y.ts"]);

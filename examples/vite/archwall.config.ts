@@ -1,6 +1,11 @@
-import * as path from "node:path";
-import { featureIsolation, layerDependencies, noCycles, publicApi } from "@archwall/rules";
-import { defineClassifier, defineConfig } from "archwall";
+import {
+  defineClassifier,
+  defineConfig,
+  featureIsolation,
+  layerDependencies,
+  noCycles,
+  publicApi,
+} from "archwall";
 
 /*
  * ArchWall has no built-in notion of "layers". It knows two things:
@@ -43,8 +48,10 @@ const architecture = defineClassifier({
   classify(module, ctx) {
     if (module.kind !== "source" || !module.file) return null;
 
-    const rel = path.relative(ctx.sourceRoot, module.file.replaceAll("\\", "/"));
-    if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+    // `ctx.relative` is the source-root-relative path, or null when the file lies outside
+    // the tree this config describes. Every path-based classifier wants exactly this.
+    const rel = ctx.relative(module.file);
+    if (rel === null) return null;
 
     const [layer, slice, ...rest] = rel.split("/");
     if (layer === undefined || !LAYERS.includes(layer)) return null;

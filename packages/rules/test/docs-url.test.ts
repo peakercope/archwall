@@ -1,9 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
-import { DOCS_BASE, docsUrlFor } from "@archwall/rules";
-import * as rules from "@archwall/rules";
 import type { Rule } from "@archwall/core";
+import * as rules from "@archwall/rules";
+import { DOCS_BASE, docsUrlFor } from "@archwall/rules";
+import { describe, expect, it } from "vitest";
 
 /**
  * `docsUrl` fed SARIF's `helpUri` and the console reporter while being populated by

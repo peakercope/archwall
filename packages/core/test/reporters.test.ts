@@ -1,21 +1,24 @@
-import type { AnalysisResult, BuiltinReporterName, Violation } from "@archwall/core";
+import type { AnalysisResult, Edge, OutputSink, ReporterIO, Violation } from "@archwall/core";
 import { consoleReporter, jsonReporter, resolveReporters, sarifReporter } from "@archwall/core";
 import { describe, expect, it } from "vitest";
 
+const edge: Edge = {
+  from: "/src/widgets/w.ts",
+  to: "/src/features/auth/model/store.ts",
+  rawSpecifier: "@/features/auth",
+  resolvedPath: "/src/features/auth/model/store.ts",
+  kind: "static",
+  loc: { file: "/src/widgets/w.ts", line: 3, column: 0 },
+};
 const violation: Violation = {
   ruleName: "layer-dependencies",
   ruleId: "layer-dependencies",
   severity: "error",
   message: "widgets may not import features internals",
+  messageId: "higherLayer",
+  data: { fromLayer: "widgets", toLayer: "features" },
   fingerprint: "deadbeefdeadbeef",
-  edge: {
-    from: "/src/widgets/w.ts",
-    to: "/src/features/auth/model/store.ts",
-    rawSpecifier: "@/features/auth",
-    resolvedPath: "/src/features/auth/model/store.ts",
-    kind: "static",
-    loc: { file: "/src/widgets/w.ts", line: 3, column: 0 },
-  },
+  locations: [{ type: "edge", edge }],
   explanation: "widgets sits above features in the configured layer order",
 };
 const result: AnalysisResult = {
@@ -56,15 +59,31 @@ const result: AnalysisResult = {
   delivery: "complete",
   repoRoot: "/src",
 };
-function capture() {
+
+function capture(): { sink: OutputSink; lines: string[] } {
   const lines: string[] = [];
-  return { io: { write: (l: string) => lines.push(l) }, lines };
+  return { sink: { write: (l: string) => lines.push(l) }, lines };
+}
+
+/** A ReporterIO that records which destinations were opened and what went to each. */
+function captureIO(): { io: ReporterIO; written: Map<string, string[]> } {
+  const written = new Map<string, string[]>();
+  return {
+    written,
+    io: {
+      open(destination) {
+        const lines: string[] = [];
+        written.set(destination, lines);
+        return { write: (l: string) => lines.push(l) };
+      },
+    },
+  };
 }
 
 describe("console reporter", () => {
   it("prints violation with resolution chain, loc, and summary", async () => {
-    const { io, lines } = capture();
-    const r = consoleReporter(io);
+    const { sink, lines } = capture();
+    const r = consoleReporter(sink);
     await r.onRunStart!({
       runId: "r1",
       host: result.host,
@@ -80,8 +99,8 @@ describe("console reporter", () => {
   });
 
   it("prints project-relative paths, never absolute ones", async () => {
-    const { io, lines } = capture();
-    const r = consoleReporter(io);
+    const { sink, lines } = capture();
+    const r = consoleReporter(sink);
     await r.onRunStart!({
       runId: "r1",
       host: result.host,
@@ -96,19 +115,44 @@ describe("console reporter", () => {
   });
 
   it("does not double-print violations already streamed", async () => {
-    const { io, lines } = capture();
-    const r = consoleReporter(io);
+    const { sink, lines } = capture();
+    const r = consoleReporter(sink);
     await r.onViolation!(violation);
     await r.onRunEnd(result);
     const count = lines.join("\n").split("[error] layer-dependencies:").length - 1;
     expect(count).toBe(1);
   });
+
+  it("lists every member of a multi-location finding instead of naming one", async () => {
+    // A cycle's members used to survive only as prose inside the message; now they are
+    // locations, and the reporter can render them as such.
+    const cycle: Violation = {
+      ruleName: "no-cycles",
+      ruleId: "no-cycles",
+      severity: "error",
+      message: "Circular dependency among 3 modules",
+      fingerprint: "cafe",
+      locations: [
+        { type: "module", module: "/src/a.ts" },
+        { type: "module", module: "/src/b.ts" },
+        { type: "module", module: "/src/c.ts" },
+      ],
+    };
+    const { sink, lines } = capture();
+    const r = consoleReporter(sink);
+    await r.onRunStart!({ runId: "r", host: result.host, startedAt: 0, repoRoot: "/src" });
+    await r.onViolation!(cycle);
+    const text = lines.join("\n");
+    expect(text).toContain("· a.ts");
+    expect(text).toContain("· b.ts");
+    expect(text).toContain("· c.ts");
+  });
 });
 
 describe("json reporter", () => {
   it("emits parseable JSON with violations", async () => {
-    const { io, lines } = capture();
-    await jsonReporter(io).onRunEnd(result);
+    const { sink, lines } = capture();
+    await jsonReporter(sink).onRunEnd(result);
     const doc = JSON.parse(lines.join("\n"));
     expect(doc.violations).toHaveLength(1);
     expect(doc.violations[0].ruleName).toBe("layer-dependencies");
@@ -116,19 +160,29 @@ describe("json reporter", () => {
   });
 
   it("relativizes paths so the document is machine-independent", async () => {
-    const { io, lines } = capture();
-    await jsonReporter(io).onRunEnd(result);
+    const { sink, lines } = capture();
+    await jsonReporter(sink).onRunEnd(result);
     const doc = JSON.parse(lines.join("\n"));
-    expect(doc.violations[0].edge.from).toBe("widgets/w.ts");
-    expect(doc.violations[0].edge.to).toBe("features/auth/model/store.ts");
-    expect(doc.violations[0].edge.loc.file).toBe("widgets/w.ts");
+    const location = doc.violations[0].locations[0];
+    expect(location.type).toBe("edge");
+    expect(location.edge.from).toBe("widgets/w.ts");
+    expect(location.edge.to).toBe("features/auth/model/store.ts");
+    expect(location.edge.loc.file).toBe("widgets/w.ts");
+  });
+
+  it("carries messageId and data, so a consumer need not parse English", async () => {
+    const { sink, lines } = capture();
+    await jsonReporter(sink).onRunEnd(result);
+    const doc = JSON.parse(lines.join("\n"));
+    expect(doc.violations[0].messageId).toBe("higherLayer");
+    expect(doc.violations[0].data).toEqual({ fromLayer: "widgets", toLayer: "features" });
   });
 });
 
 describe("sarif reporter", () => {
   it("emits SARIF 2.1.0 with ruleId/level/location", async () => {
-    const { io, lines } = capture();
-    await sarifReporter(io).onRunEnd(result);
+    const { sink, lines } = capture();
+    await sarifReporter(sink).onRunEnd(result);
     const doc = JSON.parse(lines.join("\n"));
     expect(doc.version).toBe("2.1.0");
     expect(doc.runs[0].tool.driver.name).toBe("archwall");
@@ -139,22 +193,19 @@ describe("sarif reporter", () => {
   });
 
   it("emits a root-relative artifact URI, which GitHub code scanning requires", async () => {
-    const { io, lines } = capture();
-    await sarifReporter(io).onRunEnd(result);
+    const { sink, lines } = capture();
+    await sarifReporter(sink).onRunEnd(result);
     const doc = JSON.parse(lines.join("\n"));
     const uri = doc.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri;
-    // An absolute path here is silently useless: GitHub cannot associate the result
-    // with a file in the repository.
+    // An absolute path here is silently useless: GitHub cannot associate the result with a
+    // file in the repository.
     expect(uri).toBe("widgets/w.ts");
     expect(uri.startsWith("/")).toBe(false);
   });
 
   it("describes rules from the inventory, including ones that found nothing", async () => {
-    // `tool.driver.rules` used to be bare `{ id }` entries derived from the violations,
-    // while `meta.description` and `meta.docsUrl` sat unread — and a rule that found
-    // nothing never appeared at all.
-    const { io, lines } = capture();
-    await sarifReporter(io).onRunEnd(result);
+    const { sink, lines } = capture();
+    await sarifReporter(sink).onRunEnd(result);
     const rules = JSON.parse(lines.join("\n")).runs[0].tool.driver.rules;
     expect(rules.map((r: { id: string }) => r.id).sort()).toEqual([
       "layer-dependencies",
@@ -168,10 +219,8 @@ describe("sarif reporter", () => {
   });
 
   it("reports diagnostics as tool notifications rather than dropping them", async () => {
-    // SARIF is the CI-integrated path, which is exactly where "ArchWall never looked at
-    // your code" most needs to be visible.
-    const { io, lines } = capture();
-    await sarifReporter(io).onRunEnd(result);
+    const { sink, lines } = capture();
+    await sarifReporter(sink).onRunEnd(result);
     const invocation = JSON.parse(lines.join("\n")).runs[0].invocations[0];
     expect(invocation.toolExecutionNotifications).toHaveLength(1);
     expect(invocation.toolExecutionNotifications[0].descriptor.id).toBe("rule-skipped");
@@ -179,8 +228,8 @@ describe("sarif reporter", () => {
   });
 
   it("carries the fingerprint so consumers can track a finding across commits", async () => {
-    const { io, lines } = capture();
-    await sarifReporter(io).onRunEnd(result);
+    const { sink, lines } = capture();
+    await sarifReporter(sink).onRunEnd(result);
     const doc = JSON.parse(lines.join("\n"));
     expect(doc.runs[0].results[0].partialFingerprints.archwall).toBe("deadbeefdeadbeef");
   });
@@ -189,11 +238,33 @@ describe("sarif reporter", () => {
 describe("resolveReporters", () => {
   it("maps names to built-ins and passes customs through", () => {
     const custom = { name: "x", onRunEnd: () => {} };
-    const rs = resolveReporters(["console", "sarif", custom]);
-    expect(rs.map((r) => r.name)).toEqual(["console", "sarif", "x"]);
-    expect(rs[2]).toBe(custom);
+    const { io } = captureIO();
+    const { reporters } = resolveReporters(["console", "sarif", custom], io);
+    expect(reporters.map((r) => r.name)).toEqual(["console", "sarif", "x"]);
+    expect(reporters[2]).toBe(custom);
   });
+
   it("throws on unknown names", () => {
-    expect(() => resolveReporters(["nope" as BuiltinReporterName])).toThrow(/unknown reporter/i);
+    const { io } = captureIO();
+    expect(() => resolveReporters(["nope"], io)).toThrow(/unknown reporter/i);
+  });
+
+  it("sends each reporter to its own destination", async () => {
+    // The whole point: `--reporter console --reporter sarif --output archwall.sarif` must
+    // not put a human summary inside the SARIF document.
+    const { io, written } = captureIO();
+    const { reporters, close } = resolveReporters(
+      ["console", { reporter: "sarif", output: "archwall.sarif" }],
+      io,
+    );
+    for (const r of reporters) await r.onRunEnd(result);
+    await close();
+    expect(written.has("stdout")).toBe(true);
+    expect(written.has("archwall.sarif")).toBe(true);
+    // The SARIF destination got exactly one document and nothing else.
+    const sarif = written.get("archwall.sarif")!;
+    expect(sarif).toHaveLength(1);
+    expect(() => JSON.parse(sarif.join("\n"))).not.toThrow();
+    expect(written.get("stdout")!.join("\n")).toContain("1 error(s)");
   });
 });
