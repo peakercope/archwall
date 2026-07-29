@@ -83,15 +83,7 @@ function captureIO(): { io: ReporterIO; written: Map<string, string[]> } {
 describe("console reporter", () => {
   it("prints violation with resolution chain, loc, and summary", async () => {
     const { sink, lines } = capture();
-    const r = consoleReporter(sink);
-    await r.onRunStart!({
-      runId: "r1",
-      host: result.host,
-      startedAt: 0,
-      repoRoot: result.repoRoot,
-    });
-    await r.onViolation!(violation);
-    await r.onRunEnd(result);
+    await consoleReporter(sink).onRunEnd(result);
     const text = lines.join("\n");
     expect(text).toContain("[error] layer-dependencies:");
     expect(text).toContain("1 error(s), 0 warning(s)");
@@ -100,25 +92,18 @@ describe("console reporter", () => {
 
   it("prints project-relative paths, never absolute ones", async () => {
     const { sink, lines } = capture();
-    const r = consoleReporter(sink);
-    await r.onRunStart!({
-      runId: "r1",
-      host: result.host,
-      startedAt: 0,
-      repoRoot: result.repoRoot,
-    });
-    await r.onViolation!(violation);
+    await consoleReporter(sink).onRunEnd(result);
     const text = lines.join("\n");
     expect(text).toContain("widgets/w.ts:3:0");
     expect(text).toContain('"@/features/auth" → resolves to features/auth/model/store.ts');
     expect(text).not.toContain("/src/widgets");
   });
 
-  it("does not double-print violations already streamed", async () => {
+  it("prints each violation exactly once", async () => {
+    // Guards the reason `onViolation` was removed: two channels over one list meant the
+    // console reporter had to carry a `seen` set to avoid double-printing. One channel, no set.
     const { sink, lines } = capture();
-    const r = consoleReporter(sink);
-    await r.onViolation!(violation);
-    await r.onRunEnd(result);
+    await consoleReporter(sink).onRunEnd(result);
     const count = lines.join("\n").split("[error] layer-dependencies:").length - 1;
     expect(count).toBe(1);
   });
@@ -139,9 +124,7 @@ describe("console reporter", () => {
       ],
     };
     const { sink, lines } = capture();
-    const r = consoleReporter(sink);
-    await r.onRunStart!({ runId: "r", host: result.host, startedAt: 0, repoRoot: "/src" });
-    await r.onViolation!(cycle);
+    await consoleReporter(sink).onRunEnd({ ...result, violations: [cycle], rules: [] });
     const text = lines.join("\n");
     expect(text).toContain("· a.ts");
     expect(text).toContain("· b.ts");

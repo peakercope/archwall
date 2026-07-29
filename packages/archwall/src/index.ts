@@ -12,6 +12,7 @@ export type {
   PathClassifierOptions,
   PathPattern,
   Preset,
+  PresetMeta,
   ProjectGraph,
   Reporter,
   Rule,

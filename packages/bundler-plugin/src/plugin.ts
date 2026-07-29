@@ -77,7 +77,7 @@ export class ArchWallPlugin {
         });
         addCompilationModules(builder, compilation.moduleGraph, modules, kinds);
 
-        const { failed, summary, result } = await run.analyze(builder.build());
+        const { failed, summary, result } = await run.check(builder.build());
         if (result.violations.length === 0) return;
         const detail = result.violations.map((v) => formatViolation(v, result.repoRoot)).join("\n");
         const diagnostic = new Error(`${summary}\n${detail}`);

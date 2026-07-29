@@ -8,7 +8,7 @@ import {
   publicApi,
   requireTag,
 } from "@archwall/rules";
-import { type LayerSpec, layerNames, layerPatterns, within } from "./shared.js";
+import { type LayerSpec, layerNames, layerPatterns, presetDocsUrlFor, within } from "./shared.js";
 
 export interface LayeredOptions {
   /** Directory the layers live in, relative to the config root. Default ".". */
@@ -65,6 +65,11 @@ export const layered = definePreset((opts: LayeredOptions): Preset => {
 
   return {
     name: "layered",
+    meta: {
+      description:
+        "Ordered layers with one-way dependencies, plus the purity constraint that makes it Clean/Onion/Hexagonal.",
+      ...presetDocsUrlFor("layered"),
+    },
     classifiers: [layeredClassifier(opts)],
     rules: [
       layerDependencies({ layers }),

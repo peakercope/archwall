@@ -15,10 +15,28 @@ import type { GraphTransform } from "./transform.js";
  * adding a field to a stable type is a breaking change for anyone who wrote
  * `satisfies Preset`.
  */
+/**
+ * Descriptive facts about a preset. Nothing in core reads these yet — they exist now because
+ * `Preset` is promised as stable, so this is the last moment at which adding them is free.
+ *
+ * The index signature is the load-bearing part: with it, every future named field is additive
+ * and a third party can carry its own facts without waiting for core. Without it, this type
+ * would have exactly the problem it exists to solve.
+ */
+export interface PresetMeta {
+  /** The preset package's version, for reporters and bug reports. */
+  version?: string;
+  description?: string;
+  docsUrl?: string;
+  [key: string]: unknown;
+}
+
 export interface Preset {
   name: string;
   classifiers: Classifier[];
   rules: AnyConfiguredRule[];
+  /** See {@link PresetMeta}. Purely descriptive; it never affects analysis. */
+  meta?: PresetMeta;
   /**
    * Passes that enrich the graph before classification — the slot a TypeScript type-edge
    * enricher, or any other "add facts the bundler didn't give us" pass, lives in.

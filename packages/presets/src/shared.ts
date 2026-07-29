@@ -1,6 +1,23 @@
 import type { PathPattern } from "@archwall/core";
 
 /**
+ * Base URL for built-in preset documentation — the `docs/presets/` counterpart to
+ * `DOCS_BASE` in `@archwall/rules`, and pinned to `main` for the same reason.
+ */
+export const PRESET_DOCS_BASE: string =
+  "https://github.com/peakercope/archwall/blob/main/docs/presets";
+
+/**
+ * Spreadable `{ docsUrl }` for a preset's `meta`; empty when {@link PRESET_DOCS_BASE} is `""`.
+ *
+ * Spreadable rather than `string | undefined` because `exactOptionalPropertyTypes` draws the
+ * distinction this needs: "no documentation URL" must mean the key is ABSENT.
+ */
+export function presetDocsUrlFor(presetName: string): { docsUrl?: string } {
+  return PRESET_DOCS_BASE === "" ? {} : { docsUrl: `${PRESET_DOCS_BASE}/${presetName}.md` };
+}
+
+/**
  * Layers are either an ordered list of directory names, or a map from layer name to
  * the glob(s) that hold it — the map form is what real trees need
  * (`core/domain`, `core/application`, `infrastructure`).
@@ -18,6 +35,11 @@ export function layerNames(spec: LayerSpec): string[] {
  * Compiles a layer spec into pathClassifier patterns. A layer whose directory is a
  * plain name also captures a `slice` (its immediate subdirectory), so sibling
  * isolation inside a layer works without extra configuration.
+ *
+ * Note the `/*` before every trailing `**` that follows a CAPTURE. `**` matches zero or
+ * more segments, so `:layer/:slice/**` alone would match `domain/user.ts` and capture the
+ * FILENAME as the slice. The `/*` is what says "the captured segment is a directory" — the
+ * thing a slice actually is.
  */
 export function layerPatterns(spec: LayerSpec, publicApi: string | false): PathPattern[] {
   const patterns: PathPattern[] = [];
@@ -30,8 +52,8 @@ export function layerPatterns(spec: LayerSpec, publicApi: string | false): PathP
         only: { layer: spec },
       });
     }
-    patterns.push({ pattern: ":layer/:slice/**", only: { layer: spec } });
-    patterns.push({ pattern: ":layer/**", only: { layer: spec } });
+    patterns.push({ pattern: ":layer/:slice/*/**", only: { layer: spec } });
+    patterns.push({ pattern: ":layer/*/**", only: { layer: spec } });
     return patterns;
   }
 
@@ -44,7 +66,7 @@ export function layerPatterns(spec: LayerSpec, publicApi: string | false): PathP
           tags: { layer, visibility: "public" },
         });
       }
-      patterns.push({ pattern: `${base}/:slice/**`, tags: { layer } });
+      patterns.push({ pattern: `${base}/:slice/*/**`, tags: { layer } });
       patterns.push({ pattern: `${base}/**`, tags: { layer } });
     }
   }

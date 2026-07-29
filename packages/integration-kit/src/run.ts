@@ -45,11 +45,19 @@ export interface RunResult {
   summary: string;
 }
 
-/** Diagnostic codes grouped by the `failOnDiagnostics` switch that governs them. */
+/**
+ * Diagnostic codes grouped by the `failOnDiagnostics` switch that governs them.
+ *
+ * NOTE: a new gate has to be added in three places — here, in `DEFAULT_GATES` below, and in
+ * `resolveConfig`'s defaults in `@archwall/core`. Nothing links them at compile time beyond
+ * `keyof ResolvedFailOnDiagnostics`, which catches a missing key here but not a missing
+ * default. Consolidating them is surface work that belongs with the M3 freeze.
+ */
 const DIAGNOSTIC_GATES: Record<keyof ResolvedFailOnDiagnostics, readonly string[]> = {
   ruleFailed: ["rule-failed"],
   ruleSkipped: ["rule-skipped"],
   emptyAnalysis: ["no-modules-classified", "empty-project"],
+  emptyScope: ["empty-scope"],
   invalidOptions: ["invalid-rule-options"],
   invalidConfig: ["invalid-config"],
   deprecated: ["rule-deprecated"],
@@ -71,14 +79,21 @@ export interface ArchWallRun {
   config: ResolvedConfig;
   configFile: string | null;
   graphBuilder(delivery?: GraphDelivery): GraphBuilder;
-  /** Engine → reporters (onRunStart, onViolation, onRunEnd) → failed/summary. */
-  analyze(graph: ProjectGraph): Promise<RunResult>;
+  /**
+   * Engine → reporters (onRunStart, onRunEnd) → failed/summary.
+   *
+   * Named `check`, not `analyze`: `analyze` is the pure engine entry point in `@archwall/core`
+   * and this is the impure edge around it — it opens sinks, drives reporters, and decides
+   * pass/fail. One word for both was the reason nobody could tell which one a call site meant.
+   */
+  check(graph: ProjectGraph): Promise<RunResult>;
 }
 
 const DEFAULT_GATES: ResolvedFailOnDiagnostics = {
   ruleFailed: true,
   ruleSkipped: false,
   emptyAnalysis: false,
+  emptyScope: false,
   invalidOptions: true,
   invalidConfig: true,
   deprecated: false,
@@ -147,7 +162,7 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
         ...(delivery !== undefined ? { delivery } : {}),
       });
     },
-    async analyze(graph) {
+    async check(graph) {
       const startedAt = Date.now();
       const runId = `${startedAt}-${++runCounter}`;
       // Built-ins are constructed PER RUN. The run object is memoized across watch rebuilds
@@ -160,9 +175,6 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
           await r.onRunStart?.({ runId, host: graph.host, startedAt, repoRoot: config.repoRoot });
         }
         const result = await analyze(graph, config);
-        for (const r of reporters) {
-          if (r.onViolation) for (const v of result.violations) await r.onViolation(v);
-        }
         // Awaited: a reporter that writes a file or flushes a socket must complete before
         // the caller acts on the result (the CLI sets an exit code immediately after).
         for (const r of reporters) await r.onRunEnd(result);

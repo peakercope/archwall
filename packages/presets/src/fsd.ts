@@ -8,7 +8,7 @@ import {
   publicApi,
   requireTag,
 } from "@archwall/rules";
-import { within } from "./shared.js";
+import { presetDocsUrlFor, within } from "./shared.js";
 
 export const FSD_LAYERS = ["app", "pages", "widgets", "features", "entities", "shared"] as const;
 
@@ -54,18 +54,21 @@ export function fsdClassifier(opts: FsdOptions = {}): Classifier {
       tags: { visibility: "public" },
       only: { layer: sliced },
     },
+    // The `/*` before each trailing `**` says the captured segment is a DIRECTORY. Without
+    // it, `**` matching zero segments would let `widgets/header/ui.ts` capture `ui.ts` as a
+    // segment, and `app/main.ts` capture `main.ts` as a slice.
     {
-      pattern: ":layer/:slice/:segment/**",
+      pattern: ":layer/:slice/:segment/*/**",
       tags: { visibility: "internal" },
       only: { layer: sliced },
     },
     {
-      pattern: ":layer/:slice/**",
+      pattern: ":layer/:slice/*/**",
       tags: { visibility: "internal" },
       only: { layer: sliced },
     },
     // Unsliced layers (app, shared) and anything shallower.
-    { pattern: ":layer/**", only: { layer: layers } },
+    { pattern: ":layer/*/**", only: { layer: layers } },
   ];
 
   return pathClassifier({ name: "fsd", root: src, patterns });
@@ -82,6 +85,11 @@ export const fsd = definePreset((opts: FsdOptions = {}): Preset => {
 
   return {
     name: "fsd",
+    meta: {
+      description:
+        "Feature-Sliced Design: ordered layers, isolated slices, public-API-only access.",
+      ...presetDocsUrlFor("fsd"),
+    },
     classifiers: [fsdClassifier(opts)],
     rules: [
       layerDependencies({ layers }),

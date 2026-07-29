@@ -123,7 +123,7 @@ export function archwallRollup(options: RollupAdapterOptions = {}): RollupPlugin
         }
       }
 
-      const { failed, summary, result } = await run.analyze(builder.build());
+      const { failed, summary, result } = await run.check(builder.build());
       // The map is per-build; keeping it would leak across watch rebuilds.
       rawSpecifiers.clear();
       if (result.violations.length === 0) return;

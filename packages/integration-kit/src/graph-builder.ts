@@ -10,6 +10,7 @@ import type {
 } from "@archwall/core";
 import { ArchWallError, isFirstParty, ProjectGraph } from "@archwall/core";
 import { canonicalModuleId, identifiesAFile } from "./canonical-id.js";
+import { BUILT_IR_VERSION } from "./ir-version.js";
 import { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
 
 export interface GraphBuilderOptions {
@@ -22,6 +23,15 @@ export interface GraphBuilderOptions {
   repoRoot: string;
   /** Default "complete". */
   delivery?: GraphDelivery;
+  /**
+   * IR version to stamp on the graph. Defaults to the version this package was BUILT
+   * against, which is what makes `assertIrCompatible` able to detect adapter/core skew.
+   *
+   * Set it only if you are a third-party adapter that compiles its own IR version in; a
+   * value from a runtime `IR_VERSION` import defeats the check. See
+   * docs/adr/0021-adapters-bake-their-ir-version.md.
+   */
+  irVersion?: string;
 }
 
 export interface AddModuleInput {
@@ -83,6 +93,7 @@ export class GraphBuilder {
   readonly #host: HostInfo;
   readonly #repoRoot: string;
   readonly #delivery: GraphDelivery;
+  readonly #irVersion: string;
   readonly #modules = new Map<string, AddModuleInput>();
   readonly #edges: PendingEdge[] = [];
   readonly #edgeKeys = new Set<string>();
@@ -91,6 +102,7 @@ export class GraphBuilder {
     this.#host = opts.host;
     this.#repoRoot = opts.repoRoot;
     this.#delivery = opts.delivery ?? "complete";
+    this.#irVersion = opts.irVersion ?? BUILT_IR_VERSION;
   }
 
   /** Idempotent by host id; later calls merge defined fields over earlier ones. */
@@ -222,6 +234,7 @@ export class GraphBuilder {
     return ProjectGraph.create({
       host: this.#host,
       delivery: this.#delivery,
+      irVersion: this.#irVersion,
       modules,
       edges,
     });

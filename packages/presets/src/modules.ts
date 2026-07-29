@@ -1,7 +1,7 @@
 import type { Classifier, PathPattern, Preset } from "@archwall/core";
 import { definePreset, pathClassifier } from "@archwall/core";
 import { friendModules, noCycles, publicApi, requireTag } from "@archwall/rules";
-import { within } from "./shared.js";
+import { presetDocsUrlFor, within } from "./shared.js";
 
 export interface ModulesOptions {
   /**
@@ -31,7 +31,11 @@ export function modulesClassifier(opts: ModulesOptions = {}): Classifier {
       tags: { visibility: "public" },
     });
   }
-  patterns.push({ pattern: ":module/**", tags: { visibility: "internal" } });
+  // `/*` before the trailing `**`: `**` matches zero segments, so `:module/**` alone would
+  // match a loose `stray.ts` at the root and capture the filename as a module name. A module
+  // is a DIRECTORY, and a file that is in none of them must stay untagged so `strict` mode
+  // can report it.
+  patterns.push({ pattern: ":module/*/**", tags: { visibility: "internal" } });
   return pathClassifier({ name: "modules", root, patterns });
 }
 
@@ -51,6 +55,11 @@ export const modules = definePreset((opts: ModulesOptions = {}): Preset => {
 
   return {
     name: "modules",
+    meta: {
+      description:
+        "Independent modules: an explicit dependency policy between top-level modules, each reached through its public API.",
+      ...presetDocsUrlFor("modules"),
+    },
     classifiers: [modulesClassifier(opts)],
     rules: [
       // One rule covers both modes: an empty matrix is already total isolation, and

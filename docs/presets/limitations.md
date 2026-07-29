@@ -102,10 +102,20 @@ found anything:
 
 - `no-modules-classified` — source files were analysed, but not one carried a tag
 - `empty-project` — no source modules survived the project boundary at all
+- `empty-scope` — one rule's `scope` narrowed the graph to zero modules, so that rule could
+  not have reported anything. Names the rule instance, so a typo in `scope.include` is a line
+  of output rather than a green run
 
-Neither is a violation, and neither fails your build. Both mean the same thing: the clean
+None is a violation, and none fails your build by default. All mean the same thing: the clean
 result you just got is not evidence of a clean codebase. Use `strict` (or `require-tag`
-directly) when you want unclassified files inside a known tree to be hard errors.
+directly) when you want unclassified files inside a known tree to be hard errors, and
+`failOnDiagnostics` when you want any of these to fail CI:
+
+```ts
+export default defineConfig({
+  failOnDiagnostics: { emptyScope: true, emptyAnalysis: true },
+});
+```
 
 ## What this adds up to
 

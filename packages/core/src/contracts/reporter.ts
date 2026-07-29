@@ -97,12 +97,18 @@ export interface AnalysisResult {
   repoRoot: string;
 }
 
+/**
+ * Two hooks, both batch. There is deliberately no per-violation streaming hook — see
+ * docs/adr/0020-reporters-are-batch-only.md.
+ */
 export interface Reporter {
   name: string;
+  /**
+   * Called before the engine runs. The place to reset per-run state, which matters because
+   * one reporter instance can outlive many runs in watch mode.
+   */
   onRunStart?(info: RunInfo): void | Promise<void>;
-  /** Streaming, called as each violation is found. */
-  onViolation?(v: Violation): void | Promise<void>;
-  /** Batch. Awaited, so a reporter may write a file or flush a socket. */
+  /** Awaited, so a reporter may write a file or flush a socket. */
   onRunEnd(result: AnalysisResult): void | Promise<void>;
 }
 

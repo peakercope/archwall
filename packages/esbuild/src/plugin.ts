@@ -110,7 +110,7 @@ export function archwallEsbuild(options: EsbuildAdapterOptions = {}): EsbuildPlu
           root,
         );
 
-        const { failed, summary, result: analysis } = await run.analyze(builder.build());
+        const { failed, summary, result: analysis } = await run.check(builder.build());
         if (analysis.violations.length === 0) return;
         const detail = analysis.violations
           .map((v) => formatViolation(v, analysis.repoRoot))

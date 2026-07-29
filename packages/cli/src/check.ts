@@ -20,5 +20,5 @@ export async function check(opts: CheckOptions = {}): Promise<RunResult> {
     ...(opts.io !== undefined ? { io: opts.io } : {}),
   });
   const graph = await buildGraphFromFilesystem(run.config, host);
-  return run.analyze(graph);
+  return run.check(graph);
 }

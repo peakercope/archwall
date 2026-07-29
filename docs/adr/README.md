@@ -45,3 +45,5 @@ never edit history into agreement with the present.
 | [0017](0017-projects-compose-scopes.md) | `projects` composes scopes *(proposed)* |
 | [0018](0018-public-and-internal-core-surface.md) | Public and internal core surface *(proposed)* |
 | [0019](0019-interest-boundary.md) | The interest boundary *(proposed)* |
+| [0020](0020-reporters-are-batch-only.md) | Reporters are batch-only |
+| [0021](0021-adapters-bake-their-ir-version.md) | Adapters bake their IR version at build time |

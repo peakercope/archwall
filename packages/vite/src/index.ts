@@ -63,7 +63,7 @@ export default function archwall(options: { config?: string | UserConfig } = {})
         const run = await devRun;
         const builder = run.graphBuilder("progressive");
         addDevModules(builder, server.moduleGraph.idToModuleMap.values());
-        const { result } = await run.analyze(builder.build());
+        const { result } = await run.check(builder.build());
         for (const v of result.violations)
           server.config.logger.warn(formatViolation(v, result.repoRoot));
       } catch (err) {

@@ -27,6 +27,14 @@ export interface FailOnDiagnostics {
   ruleSkipped?: boolean;
   /** Classification tagged nothing, or the boundary matched nothing. Default false. */
   emptyAnalysis?: boolean;
+  /**
+   * A rule's `scope` resolved to zero modules. Default false.
+   *
+   * Its own switch rather than part of `emptyAnalysis`: "the run looked at nothing" and "this
+   * one rule looked at nothing" are different failures, and a monorepo where some packages
+   * legitimately have no modules yet wants to tolerate the second while still gating the first.
+   */
+  emptyScope?: boolean;
   /** A rule's options failed its schema, so the rule did not run. Default true. */
   invalidOptions?: boolean;
   /** The configuration itself is wrong and something was dropped. Default true. */
@@ -39,6 +47,7 @@ export interface ResolvedFailOnDiagnostics {
   ruleFailed: boolean;
   ruleSkipped: boolean;
   emptyAnalysis: boolean;
+  emptyScope: boolean;
   invalidOptions: boolean;
   invalidConfig: boolean;
   deprecated: boolean;
@@ -504,6 +513,7 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
       ruleFailed: user.failOnDiagnostics?.ruleFailed ?? true,
       ruleSkipped: user.failOnDiagnostics?.ruleSkipped ?? false,
       emptyAnalysis: user.failOnDiagnostics?.emptyAnalysis ?? false,
+      emptyScope: user.failOnDiagnostics?.emptyScope ?? false,
       invalidOptions: user.failOnDiagnostics?.invalidOptions ?? true,
       invalidConfig: user.failOnDiagnostics?.invalidConfig ?? true,
       deprecated: user.failOnDiagnostics?.deprecated ?? false,

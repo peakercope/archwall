@@ -17,6 +17,8 @@ export type WellKnownDiagnosticCode =
   | "no-modules-classified"
   /** The project boundary (`include`/`exclude`) matched no source modules. */
   | "empty-project"
+  /** A rule's `scope` narrowed the graph to nothing, so the rule could not report anything. */
+  | "empty-scope"
   /** A rule's options failed its `optionsSchema` at config time; the rule did not run. */
   | "invalid-rule-options"
   /** The configuration itself is wrong; see the message. The rule or preset was dropped. */
@@ -51,6 +53,10 @@ export interface RuleSkippedDetails {
   host: string;
 }
 
-export function defineDiagnostic(d: Diagnostic): Diagnostic {
-  return d;
+/** Payload shape for `code: "empty-scope"`. */
+export interface EmptyScopeDetails {
+  /** The scope as configured, so the message can be acted on without reopening the config. */
+  scope: { include?: readonly string[]; exclude?: readonly string[]; tag?: Record<string, string> };
+  /** Modules in the graph before scoping — the denominator that makes "0" meaningful. */
+  totalModules: number;
 }

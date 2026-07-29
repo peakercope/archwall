@@ -63,27 +63,18 @@ export function formatViolation(v: Violation, repoRoot?: string): string {
   return lines.join("\n");
 }
 
+/**
+ * Stateless: one pass over the finished result, in `onRunEnd`.
+ *
+ * There is no `onRunStart` and no per-run state to reset, which is what makes it safe for
+ * the run object to be memoized across watch rebuilds in the bundler adapters — a reporter
+ * that accumulated anything would grow for the life of the process.
+ */
 export function consoleReporter(sink: OutputSink): Reporter {
-  // Dedup between the streaming `onViolation` channel and the batch `onRunEnd` one, for
-  // ONE run. Cleared at the start of every run: the run object is memoized across watch
-  // rebuilds in both bundler adapters, so a set living for the reporter's lifetime would
-  // retain every Violation the process had ever produced.
-  let seen = new Set<Violation>();
-  let repoRoot: string | undefined;
   return {
     name: "console",
-    onRunStart(info) {
-      seen = new Set();
-      repoRoot = info.repoRoot;
-    },
-    onViolation(v) {
-      seen.add(v);
-      sink.write(formatViolation(v, repoRoot));
-    },
     onRunEnd(result) {
-      for (const v of result.violations) {
-        if (!seen.has(v)) sink.write(formatViolation(v, result.repoRoot));
-      }
+      for (const v of result.violations) sink.write(formatViolation(v, result.repoRoot));
       // A violation's most useful next step is the rule's documentation; print it once per
       // rule that actually fired rather than on every line.
       const docs = new Map(

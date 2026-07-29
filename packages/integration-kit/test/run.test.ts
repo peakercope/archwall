@@ -45,7 +45,7 @@ describe("createArchWallRun", () => {
       .addModule({ id: appFile })
       .addEdge({ from: appFile, to: "lodash" })
       .build();
-    const { result, failed, summary } = await run.analyze(graph);
+    const { result, failed, summary } = await run.check(graph);
     expect(result.violations).toHaveLength(1);
     expect(failed).toBe(true);
     expect(summary).toContain("1 error(s)");
@@ -60,7 +60,7 @@ describe("createArchWallRun", () => {
       config: { failOn: "never", reporters: [] },
     });
     const graph = run.graphBuilder().addModule({ id: appFile }).build();
-    const { failed } = await run.analyze(graph);
+    const { failed } = await run.check(graph);
     expect(failed).toBe(false);
   });
 
@@ -88,7 +88,7 @@ describe("createArchWallRun", () => {
       config: { rules: [flagExcluded], failOn: "never", reporters: [] },
     });
     const graph = run.graphBuilder().addModule({ id: "/elsewhere/app.ts" }).build();
-    const { result } = await run.analyze(graph);
+    const { result } = await run.check(graph);
     expect(result.violations.map((v) => primaryModule(v))).toEqual(["file:/elsewhere/app.ts"]);
   });
 
@@ -111,7 +111,7 @@ describe("createArchWallRun", () => {
       config: { rules: [boom], failOn: "error", reporters: [] },
     });
     const graph = run.graphBuilder().addModule({ id: appFile }).build();
-    const { result, failed, summary } = await run.analyze(graph);
+    const { result, failed, summary } = await run.check(graph);
 
     expect(result.violations).toHaveLength(0);
     expect(result.diagnostics.map((d) => d.code)).toContain("rule-failed");
@@ -139,7 +139,7 @@ describe("createArchWallRun", () => {
       },
     });
     const graph = run.graphBuilder().addModule({ id: appFile }).build();
-    const { failed } = await run.analyze(graph);
+    const { failed } = await run.check(graph);
     expect(failed).toBe(false);
   });
 
@@ -164,7 +164,7 @@ describe("createArchWallRun", () => {
 
     for (let i = 0; i < 3; i++) {
       lines = 0;
-      await run.analyze(graph());
+      await run.check(graph());
       perRunLineCounts.push(lines);
     }
 
@@ -189,8 +189,8 @@ describe("createArchWallRun", () => {
         ],
       },
     });
-    await run.analyze(run.graphBuilder().addModule({ id: appFile }).build());
-    await run.analyze(run.graphBuilder().addModule({ id: appFile }).build());
+    await run.check(run.graphBuilder().addModule({ id: appFile }).build());
+    await run.check(run.graphBuilder().addModule({ id: appFile }).build());
     expect(runIds).toHaveLength(2);
     expect(runIds[0]).not.toBe(runIds[1]);
   });
@@ -202,7 +202,7 @@ describe("createArchWallRun", () => {
       io: { open: () => ({ write: () => {} }) },
     });
     const graph = run.graphBuilder().addModule({ id: "/elsewhere/app.ts" }).build();
-    const { result } = await run.analyze(graph);
+    const { result } = await run.check(graph);
     // The tool's most dangerous failure mode is silence: zero violations because it
     // never looked at anything must not be indistinguishable from a clean codebase.
     expect(result.diagnostics.map((d) => d.code)).toContain("empty-project");

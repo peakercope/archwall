@@ -17,8 +17,19 @@ interface RuleRun {
   resolved: ResolvedRule;
   ctx: RuleContext<unknown>;
   info: RuleRunInfo;
-  /** Set once the rule throws; it takes no further part in the run. */
-  failed: boolean;
+  /**
+   * This rule takes no further part in the run. Set for three different reasons — the host
+   * lacks a capability it requires, its declaration is invalid, or it threw — which is why
+   * it is not the flag that decides whether to keep its violations.
+   */
+  halted: boolean;
+  /**
+   * It threw. Separate from {@link halted} because only this one means "whatever it already
+   * reported is untrustworthy": a rule that stopped halfway through the edge list reported
+   * findings from a partial view of the graph, and the absence of a finding it never got to
+   * is not evidence of anything.
+   */
+  crashed: boolean;
 }
 
 /**
@@ -51,16 +62,23 @@ export async function analyze(
 
   // One scoped VIEW per distinct scope — sharing the base query's index, not rebuilding it.
   // "FSD under apps/web" is typically the scope of several rules at once.
-  const scopedQueries = new Map<string, GraphQuery>();
+  //
+  // `size` rides along because resolving a scope is O(modules) and the `empty-scope` audit
+  // needs the count for every rule, not once per distinct scope.
+  const scopedQueries = new Map<string, { query: GraphQuery; size: number }>();
   const scopeKeyOf = (scope: RuleScope | undefined): string =>
     scope === undefined
       ? "*"
       : JSON.stringify([scope.include ?? null, scope.exclude ?? null, scope.tag ?? null]);
-  const queryFor = (scope: RuleScope | undefined, key: string): GraphQuery => {
-    if (scope === undefined) return query;
+  const queryFor = (
+    scope: RuleScope | undefined,
+    key: string,
+  ): { query: GraphQuery; size: number } => {
+    if (scope === undefined) return { query, size: classified.moduleCount };
     let scoped = scopedQueries.get(key);
     if (!scoped) {
-      scoped = query.scoped(modulesInScope(classified, scope, config.sourceRoot));
+      const ids = modulesInScope(classified, scope, config.sourceRoot);
+      scoped = { query: query.scoped(ids), size: ids.size };
       scopedQueries.set(key, scoped);
     }
     return scoped;
@@ -116,7 +134,8 @@ export async function analyze(
           durationMs: 0,
           missingCapabilities: missing,
         },
-        failed: true,
+        halted: true,
+        crashed: false,
       });
       continue;
     }
@@ -132,7 +151,8 @@ export async function analyze(
         resolved,
         ctx: null as never,
         info: { ...base, status: "skipped", violations: 0, durationMs: 0 },
-        failed: true,
+        halted: true,
+        crashed: false,
       });
       continue;
     }
@@ -141,7 +161,22 @@ export async function analyze(
     const scopeKey = scopeKeyOf(scope);
     // Scoping happens HERE, once, for every rule that will ever exist — rather than as a
     // `within` option each rule has to remember to implement.
-    const scopedQuery = queryFor(scope, scopeKey);
+    const { query: scopedQuery, size: scopeSize } = queryFor(scope, scopeKey);
+
+    // The silence doctrine, per rule. Global silence was already diagnosed; this closes the
+    // hole one level down, where a typo in `scope.include` makes a rule survey nothing,
+    // report nothing, and pass green — indistinguishable from a clean architecture. Emitted
+    // per RULE rather than inside the memoized `queryFor`, so ten rules sharing one bad scope
+    // produce ten diagnostics naming ten rules rather than one naming none of them.
+    if (scope !== undefined && scopeSize === 0) {
+      diagnostics.push({
+        code: "empty-scope",
+        severity: "warn",
+        ruleId: id,
+        message: `Rule "${id}" is scoped to 0 of ${classified.moduleCount} modules, so it cannot report anything. Check \`scope\` — path patterns are matched relative to \`sourceRoot\` ("${config.sourceRoot}"), and \`tag\` requires the module to already be classified.`,
+        details: { scope, totalModules: classified.moduleCount },
+      });
+    }
     const ctx: RuleContext<unknown> = {
       // Already validated (and possibly transformed) by `resolveConfig`.
       options,
@@ -190,17 +225,18 @@ export async function analyze(
       resolved,
       ctx,
       info: { ...base, status: "ran", violations: 0, durationMs: 0 },
-      failed: false,
+      halted: false,
+      crashed: false,
     });
   }
 
-  const active = runs.filter((r) => !r.failed);
+  const active = runs.filter((r) => !r.halted);
   dispatchVisitors(active, diagnostics, scopeKeyOf);
 
   // Whole-graph rules run after the traversal, and one at a time: they may be async, and
   // several of them share the memoized computation cache.
   for (const run of active) {
-    if (run.failed || run.resolved.rule.check === undefined) continue;
+    if (run.halted || run.resolved.rule.check === undefined) continue;
     const startedRule = performance.now();
     try {
       await run.resolved.rule.check(run.ctx);
@@ -210,20 +246,32 @@ export async function analyze(
     run.info.durationMs += performance.now() - startedRule;
   }
 
+  // A crashed rule's partial findings are discarded, which is what makes the `rule-failed`
+  // diagnostic ("threw and produced no results") true. Keeping them would be worse than
+  // useless: they come from a rule that stopped partway through the graph, so the set is
+  // neither complete nor known-incomplete to anyone reading it, and a baseline built over it
+  // would encode findings that vanish the moment the crash is fixed. Rule instance ids are
+  // unique, so matching on `ruleId` is exact.
+  //
+  // Diagnostics the rule caused on its way down are NOT discarded — an `invalid-config` for a
+  // missing message template is a real defect regardless of what happened next.
+  const crashed = new Set(runs.filter((r) => r.crashed).map((r) => r.info.id));
+  const kept = crashed.size === 0 ? violations : violations.filter((v) => !crashed.has(v.ruleId));
+
   // Rules interleave inside a shared traversal, so a start/end offset per rule would not
-  // attribute correctly; counts come from the violations themselves.
+  // attribute correctly; counts come from the violations themselves. Counted over what was
+  // KEPT and set for every status, so a failed rule reports 0 because it produced nothing —
+  // `result.rules` and `result.violations` cannot disagree.
   const perRule = new Map<string, number>();
-  for (const v of violations) perRule.set(v.ruleId, (perRule.get(v.ruleId) ?? 0) + 1);
-  for (const run of runs) {
-    if (run.info.status === "ran") run.info.violations = perRule.get(run.info.id) ?? 0;
-  }
+  for (const v of kept) perRule.set(v.ruleId, (perRule.get(v.ruleId) ?? 0) + 1);
+  for (const run of runs) run.info.violations = perRule.get(run.info.id) ?? 0;
 
   diagnostics.push(...auditClassification(classified));
 
   return {
     // Deterministic order: baselines, CI diffing, and snapshot tests all need two runs of
     // the same analysis to be byte-identical.
-    violations: violations.sort(compareViolations),
+    violations: kept.sort(compareViolations),
     diagnostics,
     rules: runs.map((r) => r.info),
     repoRoot: config.repoRoot,
@@ -313,7 +361,7 @@ function dispatchVisitors(
     for (const bucket of buckets.values()) {
       const items = bucket.slice();
       for (const { run, visit } of bucket.members) {
-        if (run.failed) continue;
+        if (run.halted) continue;
         const startedRule = performance.now();
         try {
           for (const item of items) visit(item, run.ctx);
@@ -330,7 +378,8 @@ function dispatchVisitors(
 }
 
 function markFailed(run: RuleRun, err: unknown, diagnostics: Diagnostic[]): void {
-  run.failed = true;
+  run.halted = true;
+  run.crashed = true;
   run.info.status = "failed";
   diagnostics.push({
     code: "rule-failed",

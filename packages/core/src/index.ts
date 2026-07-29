@@ -29,11 +29,11 @@ export type {
   Diagnostic,
   DiagnosticCode,
   DiagnosticSeverity,
+  EmptyScopeDetails,
   RuleSkippedDetails,
   WellKnownDiagnosticCode,
 } from "./contracts/diagnostic.js";
-export { defineDiagnostic } from "./contracts/diagnostic.js";
-export type { Preset } from "./contracts/preset.js";
+export type { Preset, PresetMeta } from "./contracts/preset.js";
 export { definePreset } from "./contracts/preset.js";
 export type {
   AnalysisResult,
