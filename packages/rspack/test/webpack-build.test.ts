@@ -26,7 +26,7 @@ describe("@archwall/rspack with webpack", () => {
       }),
     );
     expect(outcome.hasErrors, outcome.text).toBe(false);
-    assertViolationsMatch(collected, srcRoot, FSD_APP_EXPECTED);
+    assertViolationsMatch(collected, FSD_APP_EXPECTED);
   }, 60_000);
 
   it("attaches import locations, which webpack — unlike Rspack — exposes", async () => {

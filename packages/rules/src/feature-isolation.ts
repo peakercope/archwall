@@ -43,7 +43,13 @@ export const featureIsolation = defineRule<FeatureIsolationOptions>({
         ctx.report({
           edge: e,
           messageId: "siblingSlice",
-          data: { from: e.from, to: e.to, fromSlice, toSlice, layer: scope },
+          data: {
+            from: ctx.display(e.from),
+            to: ctx.display(e.to),
+            fromSlice,
+            toSlice,
+            layer: scope,
+          },
           explanation: `Slices within layer "${scope}" are isolated; share code via a lower layer or the slice's public API.`,
         });
       },

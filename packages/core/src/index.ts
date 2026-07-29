@@ -80,6 +80,7 @@ export type {
   GraphMutation,
   HostInfo,
   ModuleId,
+  ModuleIdScheme,
   ModuleKind,
   ModuleNode,
   ProjectGraphInit,
@@ -89,12 +90,15 @@ export type {
 } from "./graph/ir.js";
 export {
   assertIrCompatible,
+  displayModuleId,
   FIRST_PARTY_KINDS,
   IR_VERSION,
   irMajor,
   isFirstParty,
   isThirdParty,
+  MODULE_ID_SCHEMES,
   ProjectGraph,
+  parseModuleId,
   THIRD_PARTY_KINDS,
 } from "./graph/ir.js";
 export type { EdgeFilter, ModuleFilter, ModuleSelection } from "./graph/query.js";

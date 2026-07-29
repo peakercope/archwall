@@ -2,7 +2,7 @@ import * as path from "node:path";
 import { check } from "@archwall/cli";
 import type { Preset, Reporter, UserConfig, Violation } from "@archwall/core";
 import archwallEsbuild from "@archwall/esbuild";
-import { packageNameFromPath, primaryEdge, primaryModule } from "@archwall/integration-kit";
+import { primaryEdge, primaryModule } from "@archwall/integration-kit";
 import { fsd, layered, modules } from "@archwall/presets";
 import archwallRollup from "@archwall/rollup";
 import ArchWallPlugin from "@archwall/rspack";
@@ -14,40 +14,37 @@ import { buildWithRollup } from "../../rollup/test/builds.js";
 import { buildWithRspack, buildWithWebpack, fixture } from "../../rspack/test/bundlers.js";
 
 /**
- * Externals differ by path between hosts but never by package identity.
+ * Violations reduced to (rule, from, to) over CANONICAL module ids.
  *
- * The `isAbsolute` guard matters: a host that leaves an external unresolved reports the
- * bare specifier (`react`), and `path.relative` would resolve that against `process.cwd()`
- * and turn it into `../../../../../react`. Only the hosts that resolve externals into
- * node_modules were compared before, so nothing ever exercised the other branch. This
- * mirrors `rel()` in `@archwall/integration-kit`'s conformance helpers.
+ * There used to be a normalisation step here — collapsing an external to its package name so
+ * that a host resolving `react` into node_modules compared equal to one leaving the bare
+ * specifier, with a documented guard for each branch. Two copies of that helper existed, this
+ * one and `rel()` in the conformance harness, which is what said identity did not belong to the
+ * producers. Both are gone: the suite now compares what the IR actually says, and parity holding
+ * on raw ids is the proof that it is real.
+ * See docs/adr/0012-canonical-module-identity.md.
  */
-function normalize(srcRoot: string) {
-  const at = (p: string) => {
-    const pkg = packageNameFromPath(p);
-    if (pkg !== undefined) return pkg;
-    const normalized = p.replaceAll("\\", "/");
-    return path.isAbsolute(normalized)
-      ? path.relative(srcRoot, normalized).replaceAll("\\", "/")
-      : normalized;
-  };
-  return (vs: readonly Violation[]) =>
-    vs
-      .map((v) => {
-        const edge = primaryEdge(v);
-        return [
-          v.ruleId,
-          edge ? at(edge.from) : (primaryModule(v) ?? ""),
-          edge ? at(edge.to) : "",
-        ].join("|");
-      })
-      .sort();
+function normalize(vs: readonly Violation[]): string[] {
+  return vs
+    .map((v) => {
+      const edge = primaryEdge(v);
+      return [v.ruleId, edge ? edge.from : (primaryModule(v) ?? ""), edge ? edge.to : ""].join("|");
+    })
+    .sort();
 }
 
-/** Runs one producer with a collecting reporter and returns its normalized violations. */
+/** Every violation carries its own fingerprint; this is what a baseline file would key on. */
+function fingerprints(vs: readonly Violation[]): string[] {
+  return vs.map((v) => `${v.ruleId}|${v.fingerprint}`).sort();
+}
+
+/** How a producer's violations are reduced for comparison. */
+type Projection = (vs: readonly Violation[]) => string[];
+
+/** Runs one producer with a collecting reporter and returns its violations, comparably. */
 async function collectFrom(
   produce: (collector: Reporter) => Promise<unknown>,
-  norm: (vs: readonly Violation[]) => string[],
+  project: Projection,
 ): Promise<string[]> {
   const collected: Violation[] = [];
   await produce({
@@ -56,7 +53,7 @@ async function collectFrom(
       collected.push(...r.violations);
     },
   });
-  return norm(collected);
+  return project(collected);
 }
 
 const CASES: { name: string; preset: Preset }[] = [
@@ -84,9 +81,9 @@ type Producer = "vite" | "rollup" | "esbuild" | "rspack" | "webpack" | "cli";
 async function allProducers(
   name: string,
   sharedConfig: UserConfig,
+  project: Projection = normalize,
 ): Promise<Record<Producer, string[]>> {
   const { dir, src } = fixture(name);
-  const norm = normalize(src);
   const vite = await collectFrom(
     (collector) =>
       build({
@@ -100,7 +97,7 @@ async function allProducers(
           rollupOptions: { input: path.join(src, "main.ts") },
         },
       }),
-    norm,
+    project,
   );
   const rollup = await collectFrom(
     (collector) =>
@@ -111,14 +108,14 @@ async function allProducers(
         }),
         { where: { dir, src } },
       ),
-    norm,
+    project,
   );
   const esbuild = await collectFrom(
     (collector) =>
       buildWithEsbuild(archwallEsbuild({ config: { ...sharedConfig, reporters: [collector] } }), {
         where: { dir, src },
       }),
-    norm,
+    project,
   );
   const rspack = await collectFrom(
     (collector) =>
@@ -128,7 +125,7 @@ async function allProducers(
         }),
         { dir, src },
       ),
-    norm,
+    project,
   );
   const webpack = await collectFrom(
     (collector) =>
@@ -138,9 +135,9 @@ async function allProducers(
         }),
         { dir, src },
       ),
-    norm,
+    project,
   );
-  const cli = norm((await check({ cwd: dir, config: sharedConfig })).result.violations);
+  const cli = project((await check({ cwd: dir, config: sharedConfig })).result.violations);
   return { vite, rollup, esbuild, rspack, webpack, cli };
 }
 
@@ -194,7 +191,9 @@ describe("shared-core promise", () => {
     for (const host of OTHERS) expect(after[host], host).toEqual(after.vite);
 
     const dropped = before.vite.filter((v) => !after.vite.includes(v));
-    expect(dropped).toEqual(["fsd/layer-dependencies|shared/lib/bad.ts|widgets/header/index.ts"]);
+    expect(dropped).toEqual([
+      "fsd/layer-dependencies|file:src/shared/lib/bad.ts|file:src/widgets/header/index.ts",
+    ]);
   }, 480_000);
 
   it("honors a narrowed `include` identically across every producer", async () => {
@@ -210,4 +209,42 @@ describe("shared-core promise", () => {
     for (const host of OTHERS) expect(all[host], host).toEqual(all.vite);
     expect(all.vite.some((v) => v.includes("shared/lib/bad.ts"))).toBe(false);
   }, 360_000);
+});
+
+/**
+ * The promise a baseline file will be built on: the same architecture problem, found by two
+ * different bundlers, has the same identity.
+ *
+ * This is the case that used to be false. `layered-app`'s purity violation is about `react`,
+ * which the CLI resolves to a path under node_modules and esbuild leaves as a bare specifier —
+ * so the fingerprint, which hashes the offending locations, differed by host. The parity suite
+ * above could not see it, because it compared violations only after normalising exactly that
+ * difference away. See docs/adr/0012-canonical-module-identity.md.
+ */
+describe("fingerprint stability across producers", () => {
+  for (const { name, preset } of CASES) {
+    it(`assigns identical fingerprints under every producer for ${name}`, async () => {
+      const all = await allProducers(
+        name,
+        { sourceRoot: "src", presets: [preset], failOn: "never", reporters: [] },
+        fingerprints,
+      );
+      expect(all.vite.length).toBeGreaterThan(0);
+      for (const host of OTHERS) expect(all[host], host).toEqual(all.vite);
+    }, 240_000);
+  }
+
+  it("includes a violation about a third-party package, which is the case that used to differ", async () => {
+    const preset = layered({
+      layers: ["presentation", "infrastructure", "application", "domain"],
+      pure: ["domain"],
+    });
+    const all = await allProducers("layered-app", {
+      sourceRoot: "src",
+      presets: [preset],
+      failOn: "never",
+      reporters: [],
+    });
+    expect(all.vite).toContain("layered/purity-domain|file:src/domain/rules.ts|pkg:react");
+  }, 240_000);
 });

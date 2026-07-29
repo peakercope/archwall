@@ -43,7 +43,7 @@ function snapshotProbe(
       check(ctx) {
         // Straight from the query a rule already has — no reconstruction of the graph, and
         // therefore no hand-written copy of the representation the IR keeps private.
-        sink.snapshot = graphSnapshot(ctx.graph, SRC, { edgeKinds });
+        sink.snapshot = graphSnapshot(ctx.graph, { edgeKinds });
       },
     }),
   );
@@ -117,17 +117,18 @@ describe("IR conformance across producers", () => {
     // Every first-party file must be present and `source` under all six.
     for (const [host, snap] of Object.entries(all)) {
       for (const file of [
-        "main.ts",
-        "feature/index.ts",
-        "feature/lazy.ts",
-        "shared/index.ts",
-        "shared/util.ts",
+        "file:src/main.ts",
+        "file:src/feature/index.ts",
+        "file:src/feature/lazy.ts",
+        "file:src/shared/index.ts",
+        "file:src/shared/util.ts",
       ]) {
         expect(snap.modules[file], `${host} is missing ${file}`).toBe("source");
       }
       // A runtime builtin must never be labelled a third-party package: that distinction
-      // is what makes a purity rule correct about `node:crypto` versus `lodash`.
-      expect(snap.modules["node:path"], `${host} mislabelled node:path`).toBe("builtin");
+      // is what makes a purity rule correct about `node:crypto` versus `lodash`. Its id is
+      // the prefixed spelling whether the author wrote `path` or `node:path`.
+      expect(snap.modules["builtin:node:path"], `${host} mislabelled node:path`).toBe("builtin");
     }
 
     for (const host of ["rollup", "esbuild", "rspack", "webpack", "cli"] as const) {
@@ -141,12 +142,18 @@ describe("IR conformance across producers", () => {
     // through either — this is the case that motivates analysing the compiled graph.
     const all = await graphs();
     for (const [host, snap] of Object.entries(all)) {
-      expect(snap.edges, `${host}`).toContain("main.ts -> feature/index.ts (static)");
-      expect(snap.edges, `${host}`).toContain("feature/index.ts -> shared/index.ts (static)");
+      expect(snap.edges, `${host}`).toContain(
+        "file:src/main.ts -> file:src/feature/index.ts (static)",
+      );
+      expect(snap.edges, `${host}`).toContain(
+        "file:src/feature/index.ts -> file:src/shared/index.ts (static)",
+      );
       // Coarse edge kind: `reexport-edges` is a declared capability and Vite/Rollup and
       // esbuild genuinely cannot distinguish a re-export, so the barrel edge is compared
       // as `static` rather than failing an adapter for honestly declaring its limits.
-      expect(snap.edges, `${host}`).toContain("shared/index.ts -> shared/util.ts (static)");
+      expect(snap.edges, `${host}`).toContain(
+        "file:src/shared/index.ts -> file:src/shared/util.ts (static)",
+      );
     }
   }, 360_000);
 
@@ -156,7 +163,9 @@ describe("IR conformance across producers", () => {
     // another. `dynamic` is never coarsened, precisely because it is not capability-gated.
     const all = await graphs();
     for (const [host, snap] of Object.entries(all)) {
-      expect(snap.edges, `${host}`).toContain("feature/index.ts -> feature/lazy.ts (dynamic)");
+      expect(snap.edges, `${host}`).toContain(
+        "file:src/feature/index.ts -> file:src/feature/lazy.ts (dynamic)",
+      );
     }
   }, 360_000);
 
@@ -167,6 +176,8 @@ describe("IR conformance across producers", () => {
       cwd: FIXTURE,
       config: configWith(snapshotProbe(cli, "exact")),
     });
-    expect(cli.snapshot!.edges).toContain("shared/index.ts -> shared/util.ts (reexport)");
+    expect(cli.snapshot?.edges).toContain(
+      "file:src/shared/index.ts -> file:src/shared/util.ts (reexport)",
+    );
   }, 120_000);
 });

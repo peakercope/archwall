@@ -19,14 +19,21 @@ describe("buildGraphFromFilesystem", () => {
   it("resolves tsconfig path aliases and records raw specifiers, locs, reexports", async () => {
     const config = resolveConfig({ sourceRoot: "src" }, { cwd: fixtureDir });
     const g = await buildGraphFromFilesystem(config, cliHost());
-    const cart = path.join(srcRoot, "features/cart/model/cart.ts");
-    const store = path.join(srcRoot, "features/auth/model/store.ts");
-    const deep = g.edges().find((e) => e.from === cart && e.to === store);
+    // Canonical ids, repo-root relative — `srcRoot` is only still needed for `loc.file`, which
+    // is a real filesystem path. See docs/adr/0012-canonical-module-identity.md.
+    const deep = g
+      .edges()
+      .find(
+        (e) =>
+          e.from === "file:src/features/cart/model/cart.ts" &&
+          e.to === "file:src/features/auth/model/store.ts",
+      );
     expect(deep).toBeDefined();
-    expect(deep!.rawSpecifier).toBe("@/features/auth/model/store");
-    expect(deep!.loc?.line).toBe(1);
-    const reexport = g.edges().find((e) => e.from === path.join(srcRoot, "features/auth/index.ts"));
-    expect(reexport!.kind).toBe("reexport");
+    expect(deep?.rawSpecifier).toBe("@/features/auth/model/store");
+    expect(deep?.loc?.line).toBe(1);
+    expect(deep?.loc?.file).toBe(path.join(srcRoot, "features/cart/model/cart.ts"));
+    const reexport = g.edges().find((e) => e.from === "file:src/features/auth/index.ts");
+    expect(reexport?.kind).toBe("reexport");
     expect(g.delivery).toBe("complete");
   });
 });
@@ -35,7 +42,7 @@ describe("check", () => {
   it("discovers the fixture config and reports the seeded violations", async () => {
     const { result, failed } = await check({ cwd: fixtureDir });
     expect(failed).toBe(true);
-    assertViolationsMatch(result.violations, srcRoot, FSD_APP_EXPECTED);
+    assertViolationsMatch(result.violations, FSD_APP_EXPECTED);
   });
   it("honors inline failOn override", async () => {
     const { failed } = await check({

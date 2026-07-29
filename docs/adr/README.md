@@ -37,3 +37,11 @@ never edit history into agreement with the present.
 | [0009](0009-one-project-boundary-pipeline.md) | One pipeline: boundary → transforms → boundary → classify |
 | [0010](0010-module-kind-not-external-boolean.md) | Seven module kinds instead of `external: boolean` |
 | [0011](0011-esbuild-metafile-adapter.md) | The esbuild adapter reads the metafile |
+| [0012](0012-canonical-module-identity.md) | Canonical module identity |
+| [0013](0013-scope-semantics.md) | Scope semantics: enumeration is scoped, navigation is not |
+| [0014](0014-graph-wire-format.md) | The graph has a wire format *(proposed)* |
+| [0015](0015-preset-is-the-plugin-type.md) | `Preset` is the plugin type |
+| [0016](0016-baselines-not-ignore-comments.md) | Baselines, not ignore comments *(proposed)* |
+| [0017](0017-projects-compose-scopes.md) | `projects` composes scopes *(proposed)* |
+| [0018](0018-public-and-internal-core-surface.md) | Public and internal core surface *(proposed)* |
+| [0019](0019-interest-boundary.md) | The interest boundary *(proposed)* |

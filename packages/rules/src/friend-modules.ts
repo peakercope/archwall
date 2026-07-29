@@ -46,7 +46,13 @@ export const friendModules = defineRule<FriendModulesOptions>({
         ctx.report({
           edge: e,
           messageId: "notAFriend",
-          data: { from: e.from, to: e.to, tagKey, fromValue, toValue },
+          data: {
+            from: ctx.display(e.from),
+            to: ctx.display(e.to),
+            tagKey,
+            fromValue,
+            toValue,
+          },
           explanation: `"${fromValue}" may import: ${allowed.join(", ") || "(nothing)"}.`,
         });
       },

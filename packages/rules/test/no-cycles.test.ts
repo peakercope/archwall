@@ -1,3 +1,4 @@
+import { analyze, configureRule, resolveConfig } from "@archwall/core";
 import { noCycles } from "@archwall/rules";
 import { buildFixtureGraph, runRule } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
@@ -119,5 +120,55 @@ describe("no-cycles determinism", () => {
     // Hosts iterate modules in different orders; the reported cycle must not depend on it.
     expect(f!.module).toBe(r!.module);
     expect(f!.message).toBe(r!.message);
+  });
+});
+
+/**
+ * `no-cycles` is the rule that made the scope hole visible: it is one of the few that needs the
+ * whole graph, so it reaches for `ctx.compute`, and a computation bound to the root query gave a
+ * rule scoped to one app the cycles of the entire repository.
+ * See docs/adr/0013-scope-semantics.md.
+ */
+describe("no-cycles under a scope", () => {
+  const twoApps = () =>
+    buildFixtureGraph({
+      modules: [
+        { id: "/repo/web/a.ts" },
+        { id: "/repo/web/b.ts" },
+        { id: "/repo/api/x.ts" },
+        { id: "/repo/api/y.ts" },
+      ],
+      edges: [
+        // A cycle inside `web`...
+        ["/repo/web/a.ts", "/repo/web/b.ts"],
+        ["/repo/web/b.ts", "/repo/web/a.ts"],
+        // ...and an unrelated one inside `api`.
+        ["/repo/api/x.ts", "/repo/api/y.ts"],
+        ["/repo/api/y.ts", "/repo/api/x.ts"],
+      ],
+    });
+
+  const cyclesUnder = async (scope?: { include: string[] }) => {
+    const result = await analyze(
+      twoApps(),
+      resolveConfig(
+        { rules: [configureRule(noCycles, {}, scope !== undefined ? { scope } : undefined)] },
+        { cwd: "/repo" },
+      ),
+    );
+    return result.violations.flatMap((v) =>
+      v.locations.flatMap((l) => (l.type === "module" ? [l.module] : [])),
+    );
+  };
+
+  it("reports only cycles inside the scope", async () => {
+    expect((await cyclesUnder({ include: ["web/**"] })).sort()).toEqual([
+      "/repo/web/a.ts",
+      "/repo/web/b.ts",
+    ]);
+  });
+
+  it("reports both when unscoped", async () => {
+    expect(await cyclesUnder()).toHaveLength(4);
   });
 });

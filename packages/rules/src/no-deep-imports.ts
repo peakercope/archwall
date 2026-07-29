@@ -40,8 +40,12 @@ export const noDeepImports = defineRule<NoDeepImportsOptions>({
         ctx.report({
           edge: e,
           messageId: "deepImport",
-          data: { specifier: e.rawSpecifier, from: e.from, to: e.to },
-          explanation: `Resolves to ${e.resolvedPath}. Import through the module's public entry point instead.`,
+          data: {
+            specifier: e.rawSpecifier,
+            from: ctx.display(e.from),
+            to: ctx.display(e.to),
+          },
+          explanation: `Resolves to ${ctx.display(e.resolvedPath)}. Import through the module's public entry point instead.`,
         });
       },
     },

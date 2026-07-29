@@ -1,4 +1,4 @@
-import type { Capability, Edge, ModuleNode } from "../graph/ir.js";
+import type { Capability, Edge, ModuleId, ModuleNode } from "../graph/ir.js";
 import type { EdgeFilter, GraphQuery, ModuleFilter } from "../graph/query.js";
 import type { Severity, ViolationInput } from "../violations.js";
 import type { GraphComputation } from "./analysis.js";
@@ -62,7 +62,20 @@ export interface RuleContext<Options> {
    * six copies with three different edge-case behaviours came to exist.
    */
   relative(file: string): string | null;
-  /** Shared memoized graph computations, one evaluation per run. */
+  /**
+   * A module id as a human should read it — `src/domain/rules.ts`, `react`, `node:fs`.
+   *
+   * Use it for anything that goes into a message's `data`. A canonical {@link ModuleId} is
+   * scheme-prefixed, and a rule that interpolates one raw puts `file:src/a.ts` in front of a
+   * user. See docs/adr/0012-canonical-module-identity.md.
+   */
+  display(id: ModuleId): string;
+  /**
+   * Shared memoized graph computations, one evaluation per run.
+   *
+   * Scoped like `graph`: a computation requested by a scoped rule is evaluated over that rule's
+   * slice. See docs/adr/0013-scope-semantics.md.
+   */
   compute<T>(computation: GraphComputation<T>): T;
   report(violation: ViolationInput): void;
 }

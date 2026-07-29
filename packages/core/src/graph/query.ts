@@ -157,18 +157,32 @@ export interface ModuleSelection extends Iterable<ModuleNode> {
  *
  * A scoped query is a VIEW: it shares the underlying {@link GraphIndex} with the query it
  * came from and differs only in which modules it is *about*.
+ *
+ * ## What scope does, exactly
+ *
+ * One rule: **an operation is scoped if and only if it ENUMERATES. An operation that answers a
+ * question about a module you named is never scoped.**
+ *
+ * | Operation | Scoped |
+ * |---|---|
+ * | `modules`, `moduleIds`, `moduleCount`, `edges` | yes — they enumerate |
+ * | `module`, `has`, `tagOf` | no — you named the module |
+ * | `edgesOutOf`, `edgesInto` | no — you named the module |
+ * | `reachableFrom`, `reaching`, `pathBetween` | no — traversal from a named module |
+ * | `ModuleSelection.edgesOut` / `edgesIn` | anchored: endpoints in-selection, edges unfiltered |
+ * | `RuleContext.compute` | yes — a computation enumerates |
+ *
+ * The asymmetry is deliberate rather than incidental. A scoped rule must be able to ask what an
+ * out-of-scope import target *is*, because an edge leaving the scope is the most interesting
+ * thing it can find; hiding the target would turn `layer-dependencies` under a scope from a
+ * finding into silence.
+ *
+ * See docs/adr/0013-scope-semantics.md.
  */
 export class GraphQuery {
   readonly #graph: ProjectGraph;
   readonly #index: GraphIndex;
-  /**
-   * When present, the ANCHOR set: which modules this view is about.
-   *
-   * It narrows what `modules()` returns and which edges `edges()` yields (those leaving an
-   * in-scope module). It deliberately does NOT hide anything from `module()`, `has()`, or
-   * `tagOf()` — a scoped rule still has to be able to ask what an out-of-scope import
-   * target is, because an edge leaving the scope is the most interesting thing it can find.
-   */
+  /** When present, the ANCHOR set: which modules this view is about. See the class doc. */
   readonly #scope: ReadonlySet<ModuleId> | undefined;
   /** Scoped `edges()` is one filter over the whole edge list; do it once, not per call. */
   #scopedEdges: readonly Edge[] | undefined;

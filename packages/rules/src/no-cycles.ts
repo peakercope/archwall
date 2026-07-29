@@ -30,7 +30,7 @@ export const noCycles = defineRule<NoCyclesOptions>({
   check(ctx) {
     const maxLen = ctx.options.maxCycleLength ?? 8;
     const describe = (ids: readonly string[]): string => {
-      const shown = ids.slice(0, maxLen).join(" → ");
+      const shown = ids.slice(0, maxLen).map(ctx.display).join(" → ");
       return ids.length > maxLen ? `${shown} → …` : shown;
     };
     // A cycle inside a dependency is not the user's architecture and cannot be fixed by
@@ -72,7 +72,7 @@ export const noCycles = defineRule<NoCyclesOptions>({
       ctx.report({
         edge: e,
         messageId: "selfImport",
-        data: { module: e.from },
+        data: { module: ctx.display(e.from) },
         explanation: "Self-imports are always circular.",
       });
     }

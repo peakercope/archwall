@@ -98,7 +98,11 @@ export async function buildGraphFromFilesystem(
       : {}),
   });
 
-  const builder = new GraphBuilder({ host, delivery: "complete" });
+  const builder = new GraphBuilder({
+    host,
+    repoRoot: config.repoRoot,
+    delivery: "complete",
+  });
   const kinds = createModuleKindResolver({ sourceRoot: config.sourceRoot });
   const walked = new Set(files);
   for (const file of files) builder.addModule({ id: file, file, kind: "source" });
@@ -117,7 +121,7 @@ export async function buildGraphFromFilesystem(
       // provides it. Collapsing it into "external" is what made `pure` layers reject
       // `node:crypto` as a third-party package.
       if (isBuiltinSpecifier(raw)) {
-        builder.addModule({ id: raw, file: null, kind: "builtin" });
+        builder.addModule({ id: raw, file: null, kind: "builtin", specifier: raw });
         builder.addEdge({
           from: file,
           to: raw,
@@ -149,6 +153,7 @@ export async function buildGraphFromFilesystem(
         builder.addModule({
           id: to,
           file: null,
+          specifier: raw,
           ...kinds.infer({
             id: to,
             file: null,

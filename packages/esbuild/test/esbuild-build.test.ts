@@ -62,7 +62,7 @@ function wholeGraphProbe(): ConfiguredRule<Record<string, never>> {
 describe("@archwall/esbuild", () => {
   it("reports exactly the fixture's known violations, like every other producer", async () => {
     const { violations } = await build(PRESET);
-    assertViolationsMatch(violations, SRC, FSD_APP_EXPECTED);
+    assertViolationsMatch(violations, FSD_APP_EXPECTED);
   }, 120_000);
 
   it("records what the author wrote, with no dependence on plugin order", async () => {

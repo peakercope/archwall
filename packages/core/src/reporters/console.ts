@@ -1,5 +1,6 @@
 import type { OutputDestination, OutputSink, Reporter, ReporterIO } from "../contracts/reporter.js";
 import { ArchWallError } from "../errors.js";
+import { displayModuleId } from "../graph/ir.js";
 import { toRelative } from "../paths.js";
 import type { Violation } from "../violations.js";
 import { countBySeverity, primarySourceLocation } from "../violations.js";
@@ -34,6 +35,11 @@ export const defaultIO: ReporterIO = {
  */
 export function formatViolation(v: Violation, repoRoot?: string): string {
   const at = (p: string): string => (repoRoot === undefined ? p : toRelative(repoRoot, p));
+  // Module ids get BOTH treatments, and the order matters. A canonical id is never absolute, so
+  // `at` passes it through and the scheme is then stripped; a bare id from an in-memory graph is
+  // absolute, so `at` relativizes it and there is no scheme to strip. One expression, both
+  // worlds, and neither ever prints a path from the machine that produced the graph.
+  const idOf = (id: string): string => displayModuleId(at(id));
   // The printed id is exactly the string to paste into `overrides`.
   const lines = [`[${v.severity}] ${v.ruleId}: ${v.message}`];
   const loc = primarySourceLocation(v);
@@ -42,7 +48,7 @@ export function formatViolation(v: Violation, repoRoot?: string): string {
     if (l.type === "edge") {
       lines.push(
         l.edge.rawSpecifier !== l.edge.resolvedPath
-          ? `  import "${l.edge.rawSpecifier}" → resolves to ${at(l.edge.resolvedPath)}`
+          ? `  import "${l.edge.rawSpecifier}" → resolves to ${idOf(l.edge.resolvedPath)}`
           : `  import "${l.edge.rawSpecifier}"`,
       );
     }
@@ -51,7 +57,7 @@ export function formatViolation(v: Violation, repoRoot?: string): string {
   // and burying the rest in prose.
   const modules = v.locations.filter((l) => l.type === "module");
   if (modules.length > 1) {
-    for (const m of modules) lines.push(`  · ${at(m.module)}`);
+    for (const m of modules) lines.push(`  · ${idOf(m.module)}`);
   }
   if (v.explanation) lines.push(`  ${v.explanation}`);
   return lines.join("\n");

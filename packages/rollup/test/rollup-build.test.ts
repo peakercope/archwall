@@ -62,7 +62,7 @@ describe("@archwall/rollup", () => {
       presets: [fsd()],
       failOn: "never",
     });
-    assertViolationsMatch(violations, SRC, FSD_APP_EXPECTED);
+    assertViolationsMatch(violations, FSD_APP_EXPECTED);
   }, 120_000);
 
   it("records what the author wrote when ordered before the resolvers", async () => {

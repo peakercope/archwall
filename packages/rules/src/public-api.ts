@@ -53,8 +53,13 @@ export const publicApi = defineRule<PublicApiOptions>({
         ctx.report({
           edge: e,
           messageId: "internalFromOutside",
-          data: { from: e.from, to: e.to, visibilityTagKey, internalValue },
-          explanation: `"${e.to}" is ${visibilityTagKey}:"${internalValue}"; use the owning module's public entry point (its index) instead.`,
+          data: {
+            from: ctx.display(e.from),
+            to: ctx.display(e.to),
+            visibilityTagKey,
+            internalValue,
+          },
+          explanation: `"${ctx.display(e.to)}" is ${visibilityTagKey}:"${internalValue}"; use the owning module's public entry point (its index) instead.`,
         });
       },
     },

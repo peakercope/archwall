@@ -19,17 +19,17 @@ describe("addDevModules", () => {
       importedModules: [b],
     };
     const anon: DevModuleLike = { id: null, file: null, importedModules: [] };
-    const builder = new GraphBuilder({ host, delivery: "progressive" });
+    const builder = new GraphBuilder({ host, repoRoot: "/", delivery: "progressive" });
     addDevModules(builder, [a, b, anon]);
     const g = builder.build();
     expect(g.delivery).toBe("progressive");
     expect(g.moduleCount).toBe(2);
     expect(g.edges()).toEqual([
       {
-        from: "/a.ts",
-        to: "/b.ts",
-        rawSpecifier: "/b.ts",
-        resolvedPath: "/b.ts",
+        from: "file:a.ts",
+        to: "file:b.ts",
+        rawSpecifier: "file:b.ts",
+        resolvedPath: "file:b.ts",
         kind: "static",
       },
     ]);
@@ -45,7 +45,7 @@ describe("addDevModules", () => {
       importedModules: [],
     };
     a.importedModules = [a];
-    const builder = new GraphBuilder({ host, delivery: "progressive" });
+    const builder = new GraphBuilder({ host, repoRoot: "/", delivery: "progressive" });
     addDevModules(builder, [a]);
 
     const raw = builder.build();

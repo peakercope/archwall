@@ -40,7 +40,12 @@ export const layerDependencies = defineRule<LayerDependenciesOptions>({
         ctx.report({
           edge: e,
           messageId: "higherLayer",
-          data: { from: e.from, to: e.to, fromLayer, toLayer },
+          data: {
+            from: ctx.display(e.from),
+            to: ctx.display(e.to),
+            fromLayer,
+            toLayer,
+          },
           explanation: `Configured layer order (highest first): ${layers.join(" → ")}. Modules may only import same or lower layers.`,
         });
       },

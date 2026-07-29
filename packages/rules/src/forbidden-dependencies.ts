@@ -63,7 +63,7 @@ export const forbiddenDependencies = defineRule<ForbiddenDependenciesOptions>({
             ...(entry.message !== undefined
               ? { message: entry.message }
               : { messageId: "forbidden" }),
-            data: { from: e.from, to: e.to },
+            data: { from: ctx.display(e.from), to: ctx.display(e.to) },
             explanation:
               `Matched forbid entry from=${JSON.stringify(entry.from)} to=${JSON.stringify(entry.to)}` +
               (entry.except

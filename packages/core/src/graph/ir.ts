@@ -3,7 +3,59 @@ import { ArchWallError, IrVersionMismatchError } from "../errors.js";
 /** Semver of the Project Graph IR schema itself, independent of package versions. */
 export const IR_VERSION = "1.0.0";
 
+/**
+ * A module's identity, in the IR's own vocabulary rather than the host's.
+ *
+ * ```
+ * file:<repo-relative-posix-path>   source | workspace | excluded
+ * pkg:<name>                        package    — the package, not one of its files
+ * builtin:<specifier>               builtin    — always prefixed (builtin:node:fs)
+ * virtual:<host>:<opaque>           virtual    — host-synthesized, host-specific by nature
+ * unresolved:<raw-specifier>        unresolved
+ * ```
+ *
+ * Producers report host facts; `GraphBuilder` decides identity — the same division
+ * {@link ModuleKind} already uses. That is what makes a violation's fingerprint the same under
+ * every bundler, which is what makes a baseline file possible at all.
+ *
+ * See docs/adr/0012-canonical-module-identity.md.
+ */
 export type ModuleId = string;
+
+/** The schemes {@link ModuleId} recognises. */
+export const MODULE_ID_SCHEMES = ["file", "pkg", "builtin", "virtual", "unresolved"] as const;
+
+export type ModuleIdScheme = (typeof MODULE_ID_SCHEMES)[number];
+
+const SCHEME_OF = /^(file|pkg|builtin|virtual|unresolved):/;
+
+/**
+ * Splits a canonical id into its scheme and body, or null when it carries no known scheme.
+ *
+ * Null is a legitimate answer, not an error: in-memory graphs (`@archwall/test-utils`, a
+ * playground) use bare ids, and every consumer here degrades to treating the id as opaque.
+ */
+export function parseModuleId(id: ModuleId): { scheme: ModuleIdScheme; body: string } | null {
+  const m = SCHEME_OF.exec(id);
+  if (!m) return null;
+  const scheme = m[1] as ModuleIdScheme;
+  return { scheme, body: id.slice(scheme.length + 1) };
+}
+
+/**
+ * The id as a human should read it: the path, the package name, the builtin specifier.
+ *
+ * Used by every reporter and offered to rules as `RuleContext.display`, so that a message names
+ * `src/domain/rules.ts` and `react` rather than a scheme-prefixed id — or, as before canonical
+ * ids existed, an absolute path from whichever machine produced the graph.
+ *
+ * `virtual:` keeps its prefix: it is not a path, and the prefix is the only thing that says so.
+ */
+export function displayModuleId(id: ModuleId): string {
+  const parsed = parseModuleId(id);
+  if (parsed === null || parsed.scheme === "virtual") return id;
+  return parsed.body;
+}
 
 export type WellKnownCapability =
   /** `Edge.loc` is populated. */
@@ -75,8 +127,14 @@ export type ModuleKind =
   | "excluded";
 
 export interface ModuleNode {
+  /** Canonical; see {@link ModuleId}. */
   id: ModuleId;
-  /** Absolute path; null for virtual, builtin, and unresolved modules. */
+  /**
+   * Absolute path, for the kinds that denote a file: `source`, `workspace`, `excluded`.
+   *
+   * Null for everything else — including `package`, because a dependency is one node
+   * (`pkg:react`) rather than one node per file, so there is no single file to name.
+   */
   file: string | null;
   kind: ModuleKind;
   /** npm package name, for `kind: "package"`. */

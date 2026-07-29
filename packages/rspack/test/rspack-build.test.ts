@@ -25,7 +25,7 @@ describe("@archwall/rspack with Rspack", () => {
       }),
     );
     expect(outcome.hasErrors, outcome.text).toBe(false);
-    assertViolationsMatch(collected, srcRoot, FSD_APP_EXPECTED);
+    assertViolationsMatch(collected, FSD_APP_EXPECTED);
   }, 60_000);
 
   it("fails the build per failOn: error (discovering archwall.config.ts)", async () => {

@@ -9,6 +9,7 @@ export type {
   GraphTransform,
   HostInfo,
   ModuleId,
+  ModuleIdScheme,
   ModuleKind,
   ModuleNode,
   OutputDestination,
@@ -39,11 +40,15 @@ export type {
  */
 export {
   defineTransform,
+  displayModuleId,
   dropSelfEdges,
   formatViolation,
+  parseModuleId,
   primaryEdge,
   primaryModule,
 } from "@archwall/core";
+export type { CanonicalIdInput, CanonicalIdOptions } from "./canonical-id.js";
+export { canonicalModuleId, identifiesAFile } from "./canonical-id.js";
 export type {
   ExpectedViolationAt,
   GraphSnapshot,

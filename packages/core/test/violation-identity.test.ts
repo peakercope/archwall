@@ -58,7 +58,7 @@ describe("violation fingerprints", () => {
     // Impossible to add once the first baseline ships: without a prefix, changing
     // `fingerprintOf` silently invalidates every entry instead of being detectable.
     const { violations } = await run("/proj");
-    expect(violations[0]!.fingerprint).toMatch(/^aw2:[0-9a-f]{16}$/);
+    expect(violations[0]!.fingerprint).toMatch(/^aw3:[0-9a-f]{16}$/);
   });
 
   it("identify a finding by an explicit member set when it has no single location", async () => {

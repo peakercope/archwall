@@ -99,6 +99,7 @@ export function addMetafileModules(
         builder.addModule({
           id: to,
           file: null,
+          specifier: to,
           ...kinds.infer({ id: to, file: null, specifier: to, isExternal: true }),
         });
       } else {

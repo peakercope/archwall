@@ -1,9 +1,15 @@
-import * as path from "node:path";
 import type { Edge, ModuleKind, ModuleNode, Violation } from "@archwall/core";
 import { primaryEdge, primaryModule } from "@archwall/core";
-import { packageNameFromPath } from "./module-path.js";
 
-/** Paths root-relative, forward slashes. */
+/**
+ * Canonical module ids, verbatim — `file:shared/lib/bad.ts`, `pkg:react`.
+ *
+ * There used to be a normalisation step here, collapsing an external to its package name so that
+ * a host which resolved `react` into node_modules compared equal to one which left the bare
+ * specifier. That helper was the evidence that identity did not belong to the producers; it is
+ * gone, and the suite now compares what the IR actually says.
+ * See docs/adr/0012-canonical-module-identity.md.
+ */
 export interface ExpectedViolationAt {
   rule: string;
   from: string;
@@ -18,18 +24,18 @@ export interface ExpectedViolationAt {
 export const FSD_APP_EXPECTED: ExpectedViolationAt[] = [
   {
     rule: "layer-dependencies",
-    from: "shared/lib/bad.ts",
-    to: "widgets/header/index.ts",
+    from: "file:src/shared/lib/bad.ts",
+    to: "file:src/widgets/header/index.ts",
   },
   {
     rule: "feature-isolation",
-    from: "features/cart/model/cart.ts",
-    to: "features/auth/model/store.ts",
+    from: "file:src/features/cart/model/cart.ts",
+    to: "file:src/features/auth/model/store.ts",
   },
   {
     rule: "public-api",
-    from: "features/cart/model/cart.ts",
-    to: "features/auth/model/store.ts",
+    from: "file:src/features/cart/model/cart.ts",
+    to: "file:src/features/auth/model/store.ts",
   },
 ];
 
@@ -41,41 +47,35 @@ export const FSD_APP_EXPECTED: ExpectedViolationAt[] = [
 export const LAYERED_APP_EXPECTED: ExpectedViolationAt[] = [
   {
     rule: "layer-dependencies",
-    from: "application/audit.ts",
-    to: "infrastructure/user-repository.ts",
+    from: "file:src/application/audit.ts",
+    to: "file:src/infrastructure/user-repository.ts",
   },
-  { rule: "forbidden-dependencies", from: "domain/rules.ts", to: "react" },
+  // The purity entry is the interesting one: `pkg:react` is what every host must agree on,
+  // whether it resolved the import into node_modules or left it as a bare specifier.
+  { rule: "forbidden-dependencies", from: "file:src/domain/rules.ts", to: "pkg:react" },
 ];
 
 /** Expected violations for `fixtures/modules-app` (the `modules` preset). */
 export const MODULES_APP_EXPECTED: ExpectedViolationAt[] = [
-  { rule: "public-api", from: "main.ts", to: "modules/identity/model/user.ts" },
+  {
+    rule: "public-api",
+    from: "file:src/main.ts",
+    to: "file:src/modules/identity/model/user.ts",
+  },
   {
     rule: "friend-modules",
-    from: "modules/reporting/model/report.ts",
-    to: "modules/billing/model/invoice.ts",
+    from: "file:src/modules/reporting/model/report.ts",
+    to: "file:src/modules/billing/model/invoice.ts",
   },
   {
     rule: "public-api",
-    from: "modules/reporting/model/report.ts",
-    to: "modules/billing/model/invoice.ts",
+    from: "file:src/modules/reporting/model/report.ts",
+    to: "file:src/modules/billing/model/invoice.ts",
   },
 ];
 
 function key(rule: string, from: string, to: string): string {
   return `${rule}|${from}|${to}`;
-}
-
-function rel(root: string, p: string | undefined): string {
-  if (p === undefined) return "";
-  // Externals are identified by package, not path: one adapter resolves to a file in
-  // node_modules while another keeps the bare id, and both are equally correct.
-  const pkg = packageNameFromPath(p);
-  if (pkg !== undefined) return pkg;
-  const normalized = p.replaceAll("\\", "/");
-  return path.isAbsolute(normalized)
-    ? path.relative(root, normalized).replaceAll("\\", "/")
-    : normalized;
 }
 
 /**
@@ -133,12 +133,15 @@ export interface ReadableGraph {
   edges(): readonly Edge[];
 }
 
+/**
+ * Modules and edges keyed by canonical {@link ModuleId}, so two producers can be compared
+ * directly. No `root` parameter: identity is a property of the IR, not something a comparison
+ * derives. See docs/adr/0012-canonical-module-identity.md.
+ */
 export function graphSnapshot(
   graph: ReadableGraph,
-  root: string,
   opts: GraphSnapshotOptions = {},
 ): GraphSnapshot {
-  const name = (id: string): string => rel(root, id);
   const coarse = (opts.edgeKinds ?? "coarse") === "coarse";
   const kindOf = (kind: string): string => (coarse && kind === "reexport" ? "static" : kind);
 
@@ -154,7 +157,7 @@ export function graphSnapshot(
   const modules: Record<string, ModuleKind> = {};
   for (const m of graph.modules()) {
     if (m.kind === "virtual") continue;
-    modules[name(m.file ?? m.id)] = m.kind;
+    modules[m.id] = m.kind;
   }
 
   return {
@@ -162,7 +165,7 @@ export function graphSnapshot(
     edges: graph
       .edges()
       .filter((e) => !virtual.has(e.from) && !virtual.has(e.to))
-      .map((e) => `${name(e.from)} -> ${name(e.to)} (${kindOf(e.kind)})`)
+      .map((e) => `${e.from} -> ${e.to} (${kindOf(e.kind)})`)
       .sort(),
   };
 }
@@ -195,18 +198,17 @@ export function assertGraphsMatch(
 }
 
 /**
- * Normalizes violations to {rule, from, to} with paths relative to root and compares
- * as sorted sets; throws listing both sides on mismatch.
+ * Reduces violations to {rule, from, to} over canonical ids and compares as sorted sets;
+ * throws listing both sides on mismatch.
  */
 export function assertViolationsMatch(
   violations: readonly Violation[],
-  root: string,
   expected: ExpectedViolationAt[],
 ): void {
   const actual = violations
     .map((v) => {
       const edge = primaryEdge(v);
-      return key(v.ruleName, rel(root, edge?.from ?? primaryModule(v)), rel(root, edge?.to));
+      return key(v.ruleName, edge?.from ?? primaryModule(v) ?? "", edge?.to ?? "");
     })
     .sort();
   const wanted = expected.map((e) => key(e.rule, e.from, e.to)).sort();

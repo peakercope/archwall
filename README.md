@@ -209,9 +209,40 @@ lists wherever a filter takes kinds.
 Excluded modules stay in the graph rather than being deleted — an edge *into* an excluded file
 is still a true fact, and removing the node would silently change the graph's shape.
 
+### Module identity
+
+A module's **id** is the IR's, not the host's:
+
+| Scheme | For | Example |
+|---|---|---|
+| `file:` | `source`, `workspace`, `excluded` | `file:src/domain/rules.ts` (repo-relative) |
+| `pkg:` | `package` | `pkg:react`, `pkg:@scope/pkg` |
+| `builtin:` | `builtin` | `builtin:node:fs` (a bare `fs` normalises to this) |
+| `virtual:` | `virtual` | `virtual:vite:preload-helper` |
+| `unresolved:` | `unresolved` | `unresolved:./missing` |
+
+Producers report host facts and `GraphBuilder` decides identity — the same division `ModuleKind`
+uses. That is what makes the same finding under Vite, esbuild, Rspack, webpack, Rollup, and the
+CLI carry the **same fingerprint**, which is what makes a baseline file possible.
+
+A dependency is **one node**, not one node per file: an esbuild external is never resolved, so its
+subpath is unknowable, and any scheme keeping file granularity inside a package would diverge by
+host. `ModuleNode.file` still carries the absolute path for the kinds that denote a file, and
+`ctx.display(id)` renders an id for humans. See
+[ADR-0012](docs/adr/0012-canonical-module-identity.md).
+
+### Scoping
+
+A rule instance can be restricted to part of the graph with `scope`, applied by the engine. One
+rule governs what that narrows: **enumeration is scoped; a question about a module you named is
+not.** So `modules()`, `edges()`, and `ctx.compute()` see only the slice, while `module()`,
+`tagOf()`, `edgesOutOf()`, and `reachableFrom()` can still answer about anything — because an edge
+*leaving* the scope is the most interesting thing a scoped rule can find. See
+[ADR-0013](docs/adr/0013-scope-semantics.md).
+
 ## API stability
 
-- **Stable** (semver-major to break): config shape, rule/preset/reporter contracts, umbrella exports, the graph IR (`ModuleKind`, `Edge`, capabilities), violation fingerprints.
+- **Stable** (semver-major to break): config shape, rule/preset/reporter contracts, umbrella exports, the graph IR (`ModuleId` schemes, `ModuleKind`, `Edge`, capabilities), violation fingerprints.
 - **Experimental** (may change in minors while maturing): graph-computation API, adapter internals beyond `createArchWallRun`, progressive-delivery semantics.
 
 The graph's *representation* is deliberately **not** part of the IR. `ProjectGraph` is an
@@ -222,10 +253,12 @@ interned or columnar store stays reachable without an IR major.
 type edges) and adapter-specific capabilities arrive additively, never as an IR major. Treat an
 unrecognised kind as "some dependency exists"; never assume exhaustiveness.
 
-Every violation carries a **`fingerprint`** — a stable, machine-independent identity derived
-from the rule instance and the offending locations, deliberately *not* from the message, so
-rewording a rule does not invalidate it. It is emitted in `partialFingerprints` in SARIF and is
-the intended key for a future baseline file.
+Every violation carries a **`fingerprint`** — a stable, machine-independent identity derived from
+the rule instance and the canonical ids of the offending locations. Deliberately *not* from the
+message, so rewording a rule does not invalidate it; and deliberately not from the raw specifier or
+the edge kind, both of which vary by host. Cross-producer fingerprint parity is asserted in the test
+suite. It is emitted in `partialFingerprints` in SARIF and is the intended key for a future
+baseline file.
 
 A violation carries a **list** of `locations`, not one. A cycle is one finding about N files,
 and every consumer — console, SARIF, a future baseline — sees all of them. It also carries
@@ -241,7 +274,6 @@ Why the architecture is shaped this way, and what was rejected, is recorded in
 - No auto-fixing, no runtime (browser) enforcement.
 - **No baseline file yet.** Adopting ArchWall on an existing codebase reports everything at once, and a graph-based linter has no source text in which to put an ignore comment. Violation fingerprints ship now so the baseline can land later without changing violation identity.
 - The full inventory of what static dependency analysis can and cannot prove — including why Nx-style project tags and DDD aggregate boundaries are out of scope — is in [`docs/presets/limitations.md`](docs/presets/limitations.md).
-- Packages currently run from TypeScript sources via workspace `main` fields (great for the monorepo and tests); a dist build step is required before publishing — until then, run the CLI programmatically (`import { check } from "@archwall/cli"`) or through the test suite rather than the `archwall` bin.
 - **`no-deep-imports` does not run under Vite.** Vite 8 expands aliases before any plugin observes an import, so the adapter cannot see what the author wrote and does not claim `raw-specifiers`; the rule is skipped with a diagnostic rather than silently matching nothing. Use the CLI, Rspack/webpack, or a Rollup build with the plugin ordered first — or `public-api`, which enforces the same intent from the graph side.
 - **No incremental validation.** Every run analyses the whole graph. The rule model now declares what each rule looks at, which is the prerequisite for invalidating only the rules a changed edge can affect — but the caching itself is not built.
 - **The conformance fixtures are not published.** `assertGraphsMatch` and the `*_EXPECTED` sets are exported, but the fixtures they run against live in the repository, so a third-party adapter author cannot yet run the suite that defines conformance.

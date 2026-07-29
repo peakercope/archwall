@@ -141,6 +141,9 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
     graphBuilder(delivery) {
       return new GraphBuilder({
         host: opts.host,
+        // From the resolved config, never guessed: it is the base every `file:` id is relative
+        // to, so a different value here means different violation fingerprints.
+        repoRoot: config.repoRoot,
         ...(delivery !== undefined ? { delivery } : {}),
       });
     },

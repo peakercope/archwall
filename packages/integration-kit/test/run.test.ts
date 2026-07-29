@@ -89,7 +89,7 @@ describe("createArchWallRun", () => {
     });
     const graph = run.graphBuilder().addModule({ id: "/elsewhere/app.ts" }).build();
     const { result } = await run.analyze(graph);
-    expect(result.violations.map((v) => primaryModule(v))).toEqual(["/elsewhere/app.ts"]);
+    expect(result.violations.map((v) => primaryModule(v))).toEqual(["file:/elsewhere/app.ts"]);
   });
 
   it("fails the run when a rule crashes, even though it produced no violations", async () => {

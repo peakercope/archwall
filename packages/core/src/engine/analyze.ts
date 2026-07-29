@@ -4,7 +4,7 @@ import type { Diagnostic } from "../contracts/diagnostic.js";
 import type { AnalysisResult, RuleRunInfo } from "../contracts/reporter.js";
 import type { RuleContext, RuleScope } from "../contracts/rule.js";
 import type { Capability, Edge, ModuleId, ModuleNode, ProjectGraph } from "../graph/ir.js";
-import { assertIrCompatible } from "../graph/ir.js";
+import { assertIrCompatible, displayModuleId } from "../graph/ir.js";
 import { filterKey, GraphQuery } from "../graph/query.js";
 import { matchesPattern } from "../match.js";
 import { sourceRelative } from "../paths.js";
@@ -46,7 +46,7 @@ export async function analyze(
   for (const c of prepared.provided) effective.add(c);
 
   const query = new GraphQuery(classified);
-  const cache = new GraphComputationCache(query);
+  const cache = new GraphComputationCache();
   const relative = (file: string): string | null => sourceRelative(config.sourceRoot, file);
 
   // One scoped VIEW per distinct scope — sharing the base query's index, not rebuilding it.
@@ -139,16 +139,20 @@ export async function analyze(
 
     const templates = messageTemplates(rule.meta.messages, message);
     const scopeKey = scopeKeyOf(scope);
+    // Scoping happens HERE, once, for every rule that will ever exist — rather than as a
+    // `within` option each rule has to remember to implement.
+    const scopedQuery = queryFor(scope, scopeKey);
     const ctx: RuleContext<unknown> = {
       // Already validated (and possibly transformed) by `resolveConfig`.
       options,
-      // Scoping happens HERE, once, for every rule that will ever exist — rather than as a
-      // `within` option each rule has to remember to implement.
-      graph: queryFor(scope, scopeKey),
+      graph: scopedQuery,
       sourceRoot: config.sourceRoot,
       repoRoot: config.repoRoot,
       relative,
-      compute: (c) => cache.get(c),
+      display: displayModuleId,
+      // The rule's OWN view, not the root one: a computation enumerates the graph, and
+      // enumeration is scoped. See docs/adr/0013-scope-semantics.md.
+      compute: (c) => cache.get(c, scopedQuery),
       report: (v) => {
         const locations = locationsOf(v);
         const template = v.messageId !== undefined ? templates[v.messageId] : undefined;
