@@ -26,6 +26,37 @@ yarn workspace archwall-example-vite build    # violations fail the build
 yarn workspace archwall-example-clean-node check
 ```
 
+## Install
+
+`archwall` carries `defineConfig`, the presets, and the rules. Add the adapter for whatever
+builds your project — or the CLI, if nothing does:
+
+```sh
+npm install --save-dev archwall @archwall/vite
+```
+
+| Your build | Adapter |
+|---|---|
+| Vite | [`@archwall/vite`](packages/vite) |
+| Rollup | [`@archwall/rollup`](packages/rollup) |
+| esbuild | [`@archwall/esbuild`](packages/esbuild) |
+| Rspack | [`@archwall/rspack`](packages/rspack) |
+| webpack | [`@archwall/webpack`](packages/webpack) |
+| none, or CI only | [`@archwall/cli`](packages/cli) |
+
+<details>
+<summary>yarn / pnpm</summary>
+
+```sh
+yarn add --dev archwall @archwall/vite
+pnpm add --save-dev archwall @archwall/vite
+```
+
+</details>
+
+Node 22 or newer. Every package ships ESM and CJS with types, except `@archwall/vite` and
+`@archwall/rollup`, which are ESM-only because their hosts are.
+
 ## Quick start
 
 Pick a preset and you are done. `archwall.config.ts` is honored identically by the Rollup/Vite
@@ -150,7 +181,7 @@ esbuild has no module-graph hook, so its adapter validates at `onEnd` from the b
 | [`@archwall/rspack`](packages/rspack) | Rspack-shaped surface over `@archwall/bundler-plugin` |
 | [`@archwall/webpack`](packages/webpack) | webpack-shaped surface over `@archwall/bundler-plugin` |
 | [`@archwall/cli`](packages/cli) | Standalone CLI (own resolver: oxc-resolver + es-module-lexer) |
-| [`@archwall/test-utils`](packages/test-utils) | Fixture graphs + assertions for extension authors |
+| [`@archwall/test-utils`](packages/test-utils) | Fixture graphs + assertions for the suites in this repo — internal, not published |
 | [`archwall`](packages/archwall) | Umbrella: `defineConfig`, the three presets, **all eight rules**, `defineRule`, … |
 
 ## Writing a rule
