@@ -14,24 +14,16 @@ concurrency:
 
 jobs:
   verify:
-    name: Node ${{ matrix.node }}
+    name: Verify
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # engines declares ">=22". The floor catches accidental use of newer
-        # APIs; the ceiling is what the release job publishes from.
-        node: [22, 24]
     steps:
       - uses: actions/checkout@v6
 
-      # .yarn/ has no committed Yarn release binary, so the version pinned by
-      # the root packageManager field has to be provisioned.
       - run: corepack enable
 
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24
           cache: yarn
 
       - run: yarn install --immutable

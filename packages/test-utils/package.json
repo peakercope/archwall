@@ -15,7 +15,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "main": "./dist/index.cjs",
   "dependencies": {
