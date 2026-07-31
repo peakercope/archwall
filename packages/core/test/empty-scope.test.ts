@@ -37,7 +37,7 @@ async function diagnosticsFor(
  *
  * Global silence was already diagnosed (`empty-project`, `no-modules-classified`), but a rule
  * whose `scope` resolved to nothing ran, reported nothing, and passed green — so a typo in
- * `scope.include` looked exactly like a clean architecture. `projects` (ADR-0017) expands into
+ * `scope.include` looked exactly like a clean architecture. `projects` expands into
  * scopes, so this diagnostic is what keeps that feature from failing silently too.
  */
 describe("empty-scope diagnostic", () => {

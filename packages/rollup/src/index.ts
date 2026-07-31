@@ -5,7 +5,6 @@
  * It lives in its own package because it belongs to none of them: every hook it uses —
  * `resolveId`, `buildEnd`, `getModuleIds`, `getModuleInfo` — is Rollup's, so `@archwall/vite`
  * consumes this and adds only dev mode.
- * See docs/adr/0008-rollup-adapter-extraction.md.
  */
 
 export type { RollupAdapterOptions } from "./plugin.js";

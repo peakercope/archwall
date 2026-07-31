@@ -133,7 +133,7 @@ In Vite build mode the full graph is validated at `buildEnd` and can fail the bu
 
 Rspack and webpack validate at `finishModules`, which always sees the complete graph — including on watch rebuilds — so there is no progressive mode there and no dev/build split. Violations land on `compilation.errors` or `compilation.warnings` per `failOn`.
 
-esbuild has no module-graph hook, so its adapter validates at `onEnd` from the build's **metafile** — which it turns on for you. Two consequences follow from that being the only surface. Plugin order is irrelevant, because the metafile records what you wrote whoever resolved it, so specifier rules work wherever the plugin sits. And `bundle: true` is required for whole-graph rules: without it esbuild never follows an import, so ArchWall declines `complete-graph` and those rules skip loudly rather than reporting a clean project. Violations become esbuild errors or warnings per `failOn`. See [ADR 0011](docs/adr/0011-esbuild-metafile-adapter.md).
+esbuild has no module-graph hook, so its adapter validates at `onEnd` from the build's **metafile** — which it turns on for you. Two consequences follow from that being the only surface. Plugin order is irrelevant, because the metafile records what you wrote whoever resolved it, so specifier rules work wherever the plugin sits. And `bundle: true` is required for whole-graph rules: without it esbuild never follows an import, so ArchWall declines `complete-graph` and those rules skip loudly rather than reporting a clean project. Violations become esbuild errors or warnings per `failOn`.
 
 ## Packages
 
@@ -228,8 +228,7 @@ CLI carry the **same fingerprint**, which is what makes a baseline file possible
 A dependency is **one node**, not one node per file: an esbuild external is never resolved, so its
 subpath is unknowable, and any scheme keeping file granularity inside a package would diverge by
 host. `ModuleNode.file` still carries the absolute path for the kinds that denote a file, and
-`ctx.display(id)` renders an id for humans. See
-[ADR-0012](docs/adr/0012-canonical-module-identity.md).
+`ctx.display(id)` renders an id for humans.
 
 ### Scoping
 
@@ -237,8 +236,7 @@ A rule instance can be restricted to part of the graph with `scope`, applied by 
 rule governs what that narrows: **enumeration is scoped; a question about a module you named is
 not.** So `modules()`, `edges()`, and `ctx.compute()` see only the slice, while `module()`,
 `tagOf()`, `edgesOutOf()`, and `reachableFrom()` can still answer about anything — because an edge
-*leaving* the scope is the most interesting thing a scoped rule can find. See
-[ADR-0013](docs/adr/0013-scope-semantics.md).
+*leaving* the scope is the most interesting thing a scoped rule can find.
 
 ## API stability
 
@@ -264,9 +262,6 @@ A violation carries a **list** of `locations`, not one. A cycle is one finding a
 and every consumer — console, SARIF, a future baseline — sees all of them. It also carries
 `messageId` and `data`, so a consumer never has to parse English to recover which layers or
 which specifier a finding was about.
-
-Why the architecture is shaped this way, and what was rejected, is recorded in
-[**docs/adr**](docs/adr/README.md).
 
 ## Known limitations (v1)
 

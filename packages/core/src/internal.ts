@@ -15,10 +15,7 @@
  * These are engine mechanics: graph indexing and query-key derivation, the boundary/transform
  * pipeline, the computation cache, path normalisation, and the identity hash. The public entry
  * point exposes what these produce, never the machinery that produces it — which is what keeps
- * the interned or columnar store of docs/adr/0002-opaque-project-graph.md reachable without an
- * IR major.
- *
- * See docs/adr/0018-public-and-internal-core-surface.md.
+ * the interned or columnar store reachable without an IR major.
  */
 
 export { GraphComputationCache } from "./analysis/cache.js";

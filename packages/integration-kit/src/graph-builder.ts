@@ -28,8 +28,7 @@ export interface GraphBuilderOptions {
    * against, which is what makes `assertIrCompatible` able to detect adapter/core skew.
    *
    * Set it only if you are a third-party adapter that compiles its own IR version in; a
-   * value from a runtime `IR_VERSION` import defeats the check. See
-   * docs/adr/0021-adapters-bake-their-ir-version.md.
+   * value from a runtime `IR_VERSION` import defeats the check.
    */
   irVersion?: string;
 }
@@ -87,7 +86,7 @@ export { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
  * Producers add modules and edges keyed by whatever their host calls them; `build()` is the one
  * choke point where those become canonical {@link ModuleId}s. That single translation is what
  * makes two bundlers report the same violation with the same fingerprint — and therefore what
- * makes a baseline file possible. See docs/adr/0012-canonical-module-identity.md.
+ * makes a baseline file possible.
  */
 export class GraphBuilder {
   readonly #host: HostInfo;

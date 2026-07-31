@@ -35,7 +35,6 @@ export interface RuleMeta<Options> {
    * Rules report an id and a data bag rather than a finished sentence, so the wording stays
    * a property of the rule's *metadata*: retargetable per instance via
    * `ConfiguredRule.message`, translatable, and machine-groupable.
-   * See docs/adr/0005-message-templates.md.
    */
   messages?: Record<string, string>;
   /** Part of the curated set a "recommended" preset would enable. */
@@ -67,14 +66,14 @@ export interface RuleContext<Options> {
    *
    * Use it for anything that goes into a message's `data`. A canonical {@link ModuleId} is
    * scheme-prefixed, and a rule that interpolates one raw puts `file:src/a.ts` in front of a
-   * user. See docs/adr/0012-canonical-module-identity.md.
+   * user.
    */
   display(id: ModuleId): string;
   /**
    * Shared memoized graph computations, one evaluation per run.
    *
    * Scoped like `graph`: a computation requested by a scoped rule is evaluated over that rule's
-   * slice. See docs/adr/0013-scope-semantics.md.
+   * slice.
    */
   compute<T>(computation: GraphComputation<T>): T;
   report(violation: ViolationInput): void;
@@ -89,8 +88,6 @@ export interface RuleContext<Options> {
  *
  * `check` remains for rules that genuinely need the whole graph at once (cycle detection,
  * reachability). It is the exception, not the interface.
- *
- * See docs/adr/0003-rule-visitor-model.md.
  */
 export interface RuleVisitors<Options> {
   edges?: {
@@ -169,7 +166,6 @@ export function defineRule<O>(rule: Rule<O>): CallableRule<O> {
  * `any` rather than `unknown` deliberately: `RuleVisitors` puts `Options` in contravariant
  * position (`filter(options)`, `visit(item, ctx)`), which makes `ConfiguredRule` invariant
  * in `Options`, so `ConfiguredRule<unknown>` would reject every concrete rule there is.
- * See docs/adr/0003-rule-visitor-model.md.
  */
 // biome-ignore lint/suspicious/noExplicitAny: see above; invariance makes `unknown` unusable.
 export type AnyConfiguredRule = ConfiguredRule<any>;

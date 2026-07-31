@@ -8,7 +8,6 @@ import { primaryEdge, primaryModule } from "@archwall/core";
  * a host which resolved `react` into node_modules compared equal to one which left the bare
  * specifier. That helper was the evidence that identity did not belong to the producers; it is
  * gone, and the suite now compares what the IR actually says.
- * See docs/adr/0012-canonical-module-identity.md.
  */
 export interface ExpectedViolationAt {
   rule: string;
@@ -136,7 +135,7 @@ export interface ReadableGraph {
 /**
  * Modules and edges keyed by canonical {@link ModuleId}, so two producers can be compared
  * directly. No `root` parameter: identity is a property of the IR, not something a comparison
- * derives. See docs/adr/0012-canonical-module-identity.md.
+ * derives.
  */
 export function graphSnapshot(
   graph: ReadableGraph,

@@ -10,8 +10,6 @@ import { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
  * The *facts* differ per host and always will; the *policy* must not. Adapters supply only
  * what their host actually knows, and this decides what it adds up to — so a rule about
  * `workspace` modules means the same thing under every producer.
- *
- * See docs/adr/0010-module-kind-not-external-boolean.md.
  */
 
 const NODE_MODULES = /[\\/]node_modules[\\/]/;

@@ -35,7 +35,7 @@ export interface GraphTransform {
    * Graph-in/graph-out meant every third-party transform in existence saw and
    * reconstructed the concrete representation, which froze it — and invited the whole
    * class of bug where a transform rebuilds a graph and silently drops a field it did not
-   * know about. See docs/adr/0002-opaque-project-graph.md.
+   * know about.
    *
    * A transform that throws is isolated the same way a rule is: reported as a diagnostic,
    * its partial writes discarded, and the pipeline continues — one broken enricher must

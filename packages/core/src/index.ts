@@ -1,7 +1,7 @@
 /**
  * The public, frozen surface of `@archwall/core`. Adding a name here is a minor release;
  * removing one is a major. Engine mechanics belong in `./internal.ts`, which carries no
- * guarantee — see docs/adr/0018-public-and-internal-core-surface.md.
+ * guarantee
  *
  * `test/public-surface.test.ts` holds both halves to their frozen lists.
  */

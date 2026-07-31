@@ -243,7 +243,7 @@ export interface ResolvedConfig {
    * Reported rather than thrown: a throw inside a bundler's `buildEnd` produces a stack
    * trace and destroys every other finding in the run. One mistyped `overrides` key costs
    * you that key, not the analysis — and `failOnDiagnostics.invalidConfig` still fails the
-   * run. See docs/adr/0007-config-errors-as-diagnostics.md.
+   * run.
    */
   diagnostics: readonly Diagnostic[];
 }

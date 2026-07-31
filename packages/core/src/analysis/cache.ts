@@ -6,7 +6,7 @@ import type { GraphQuery } from "../graph/query.js";
  * one traversal.
  *
  * The view is part of the key because a computation is an ENUMERATION of the graph, and
- * enumeration is scoped (docs/adr/0013-scope-semantics.md). A cache bound to the root query
+ * enumeration is scoped. A cache bound to the root query
  * would hand a rule scoped to `apps/web` the cycles of the whole repository — the rule's
  * `ctx.graph` narrowed and its `ctx.compute` silently not.
  *

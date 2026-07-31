@@ -15,8 +15,7 @@ function readIrVersion(): string {
   if (match === null) {
     throw new Error(
       'tsdown.shared.ts: could not find `export const IR_VERSION = "…"` in ' +
-        "packages/core/src/graph/ir.ts. If the declaration moved, update this reader — see " +
-        "docs/adr/0021-adapters-bake-their-ir-version.md.",
+        "packages/core/src/graph/ir.ts. If the declaration moved, update this reader",
     );
   }
   return match[1]!;
@@ -38,8 +37,6 @@ export const shared = {
    * `@archwall/integration-kit` stamps it onto the graphs it builds so that
    * `assertIrCompatible` has an adapter-side version to compare, rather than
    * comparing core's constant to itself.
-   *
-   * See docs/adr/0021-adapters-bake-their-ir-version.md.
    */
   define: { __ARCHWALL_IR_VERSION__: JSON.stringify(readIrVersion()) },
   format: ["esm", "cjs"],

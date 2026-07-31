@@ -89,7 +89,6 @@ async function main(): Promise<void> {
   const { failed, summary } = await check({ cwd, config });
   // stderr, always: a machine-readable reporter owns stdout, and commentary sharing that
   // stream is what makes `--reporter json > out.json` produce something that is not JSON.
-  // See docs/adr/0006-reporter-output-destinations.md.
   console.error(summary);
   process.exitCode = failed ? 1 : 0;
 }

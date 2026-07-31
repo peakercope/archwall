@@ -91,7 +91,7 @@ describe("external identity in expectations", () => {
   /**
    * The property the whole scheme exists for: a host that resolved `react` into node_modules
    * and one that left the bare specifier must produce the same graph, with no normalisation
-   * step anywhere downstream. See docs/adr/0012-canonical-module-identity.md.
+   * step anywhere downstream.
    */
   it("gives a resolved external and an unresolved one the same identity", async () => {
     const repoRoot = "/root";

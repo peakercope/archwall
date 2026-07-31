@@ -17,7 +17,7 @@ function builder(irVersion?: string): GraphBuilder {
  * `assertIrCompatible` exists to catch adapter/core SKEW — an adapter built against IR 1.x
  * loaded beside a core that speaks 2.x. It could not, because `GraphBuilder` never stamped a
  * version, so `ProjectGraph.create` defaulted it to the linked core's `IR_VERSION` and the
- * check compared that constant to itself. See docs/adr/0021-adapters-bake-their-ir-version.md.
+ * check compared that constant to itself.
  */
 describe("GraphBuilder stamps an IR version", () => {
   it("stamps the version it was built against by default", () => {

@@ -13,8 +13,6 @@ import { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
  * This is the identity counterpart of `createModuleKindResolver`, and it runs in the same place
  * for the same reason: one policy, applied at the single choke point every producer already
  * passes through.
- *
- * See docs/adr/0012-canonical-module-identity.md.
  */
 
 /** Everything identity is derived from. All of it already known by the time a module is added. */

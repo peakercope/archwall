@@ -8,13 +8,11 @@ import { diffSymbols, readBarrelSurface } from "./support/exported-symbols.js";
  *
  * Editing either list IS the review gate. There is deliberately no `--update`: a regenerable
  * snapshot turns "the public API changed" into one keystroke and a diff line reviewers skim,
- * and the whole point of ADR-0018 is that this line gets drawn on purpose rather than by
+ * and this line gets drawn on purpose rather than by
  * whichever internal a popular downstream package happened to reach for.
  *
  * Adding a name here is a minor release. Removing one is a MAJOR. Anything that is neither
  * belongs in `src/internal.ts`, which has no list because it has no guarantee.
- *
- * See docs/adr/0018-public-and-internal-core-surface.md.
  */
 const PUBLIC_VALUES = [
   "analyze",
@@ -148,7 +146,7 @@ const PUBLIC_TYPES = [
 ].toSorted();
 
 /**
- * The ceiling from ADR-0018 — a limit on how much of the engine leaks out as a compatibility
+ * The ceiling — a limit on how much of the engine leaks out as a compatibility
  * obligation, not on ambition. The margin below it is the budget for 1.x additions.
  */
 const MAX_PUBLIC_VALUES = 60;
@@ -163,7 +161,7 @@ function assertNoDrift(problems: readonly string[]): void {
     "The public surface of @archwall/core changed.\n" +
       "If that is intentional, update the frozen list in this file and say so in the release " +
       "notes — removals are MAJOR. If it is not, the symbol probably belongs in " +
-      "src/internal.ts.\nSee docs/adr/0018-public-and-internal-core-surface.md.\n  " +
+      "src/internal.ts.\n  " +
       problems.join("\n  "),
   );
 }
@@ -210,7 +208,7 @@ describe("public API surface of @archwall/core", () => {
     assertNoDrift(problems);
   });
 
-  it("keeps the public value count under the ADR-0018 ceiling", async () => {
+  it("keeps the public value count under ceiling", async () => {
     const count = Object.keys(await import("@archwall/core")).length;
     expect(
       count,

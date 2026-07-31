@@ -22,7 +22,7 @@ export interface OutputSink {
  * to stderr, or to `archwall.sarif` without knowing which.
  *
  * Per-reporter, so that a machine-readable document and a human summary in the same run
- * never share a stream. See docs/adr/0006-reporter-output-destinations.md.
+ * never share a stream.
  */
 export interface ReporterIO {
   open(destination: OutputDestination): OutputSink;
@@ -98,8 +98,7 @@ export interface AnalysisResult {
 }
 
 /**
- * Two hooks, both batch. There is deliberately no per-violation streaming hook — see
- * docs/adr/0020-reporters-are-batch-only.md.
+ * Two hooks, both batch. There is deliberately no per-violation streaming hook
  */
 export interface Reporter {
   name: string;

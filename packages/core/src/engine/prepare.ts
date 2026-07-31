@@ -37,8 +37,6 @@ export interface PrepareResult {
  * only ever re-kinds `source` → `excluded`. With no transforms configured, boundary and
  * classification are one fused pass over the modules.
  *
- * See docs/adr/0009-one-project-boundary-pipeline.md.
- *
  * Excluded modules are re-kinded, never deleted. An edge *into* an excluded file still says
  * something true about the architecture, and deleting the node would silently rewrite the
  * graph's shape (a cycle through a test helper would vanish).

@@ -60,8 +60,7 @@ describe("GraphBuilder", () => {
 });
 
 /**
- * Identity is the IR's, not the host's — the property that makes a violation fingerprint the
- * same under every bundler. See docs/adr/0012-canonical-module-identity.md.
+ * Identity is the IR's, not the host's — the property that makes a violation fingerprint the same under every bundler.
  */
 describe("canonical module ids", () => {
   it("identifies first-party files by their repo-relative path", () => {

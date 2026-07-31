@@ -60,7 +60,6 @@ describe("GraphComputationCache", () => {
 
   it("computes separately per view, so a scoped rule never gets whole-graph results", () => {
     // The bug this key exists to prevent: `ctx.graph` narrowed and `ctx.compute` silently not.
-    // See docs/adr/0013-scope-semantics.md.
     let calls = 0;
     const counting = defineGraphComputation({
       name: "count",

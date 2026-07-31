@@ -22,7 +22,6 @@ import { buildWithRspack, buildWithWebpack, fixture } from "../../rspack/test/bu
  * one and `rel()` in the conformance harness, which is what said identity did not belong to the
  * producers. Both are gone: the suite now compares what the IR actually says, and parity holding
  * on raw ids is the proof that it is real.
- * See docs/adr/0012-canonical-module-identity.md.
  */
 function normalize(vs: readonly Violation[]): string[] {
   return vs
@@ -219,7 +218,7 @@ describe("shared-core promise", () => {
  * which the CLI resolves to a path under node_modules and esbuild leaves as a bare specifier —
  * so the fingerprint, which hashes the offending locations, differed by host. The parity suite
  * above could not see it, because it compared violations only after normalising exactly that
- * difference away. See docs/adr/0012-canonical-module-identity.md.
+ * difference away.
  */
 describe("fingerprint stability across producers", () => {
   for (const { name, preset } of CASES) {

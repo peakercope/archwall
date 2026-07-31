@@ -3,7 +3,7 @@ import { defineConfig } from "tsdown";
 import { shared } from "../../tsdown.shared.ts";
 
 // src/internal.ts is the unstable half of core's surface
-// (docs/adr/0018-public-and-internal-core-surface.md). A second entry, not a deep import into
+// A second entry, not a deep import into
 // dist: tsdown generates one export subpath per entry, so this produces "./internal" while
 // src/index.ts keeps "." along with main/module/types.
 //

@@ -16,7 +16,6 @@ import { describe, expect, it } from "vitest";
  * The rule is: an operation is scoped iff it ENUMERATES; an operation about a module you named
  * is never scoped. Three different behaviours used to coexist here with nothing stating which
  * applied where, which is survivable at eight built-in rules and a bug factory at fifty.
- * See docs/adr/0013-scope-semantics.md.
  */
 
 //   web/a ──► web/b

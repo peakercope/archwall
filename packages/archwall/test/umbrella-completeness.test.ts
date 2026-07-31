@@ -4,19 +4,12 @@ import { describe, expect, it } from "vitest";
 import { readBarrelSurface } from "../../core/test/support/exported-symbols.js";
 
 /**
- * ADR-0018's umbrella-completeness requirement: `archwall` re-exports EVERYTHING public from
- * `@archwall/core`, so it is genuinely "the only package most users import". A user who hits
- * "not exported from `archwall`" and adds `@archwall/core` alongside it has already lost the
- * benefit this package exists to provide.
- *
  * Values are compared at runtime and types from source, and the split is what makes the check
  * sharp. A symbol core exports as a class but the umbrella re-exports with `export type` is
  * missing from the umbrella's runtime namespace while looking entirely correct in its source
  * — only the runtime comparison sees it. That is not hypothetical: `ProjectGraph` and
  * `GraphQuery` are classes in core and were re-exported as types here, so `new ProjectGraph()`
  * failed for anyone importing from `archwall`.
- *
- * See docs/adr/0018-public-and-internal-core-surface.md.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -27,7 +20,7 @@ function assertComplete(missing: readonly string[], kind: string): void {
   if (missing.length === 0) return;
   throw new Error(
     `The \`archwall\` umbrella is missing ${missing.length} public ${kind}(s) from ` +
-      "@archwall/core. ADR-0018 requires the umbrella to re-export everything public from " +
+      "@archwall/core. It requires the umbrella to re-export everything public from " +
       'core; the way it holds that is `export * from "@archwall/core";`.\n  ' +
       missing.toSorted().join("\n  "),
   );
@@ -78,8 +71,7 @@ describe("archwall umbrella completeness", () => {
     // sentence as the violation it warns against.
     expect(
       readBarrelSurface(UMBRELLA_BARREL).sources,
-      "The umbrella is the stable, user-facing package, so nothing unstable may reach users " +
-        "through it. See docs/adr/0018-public-and-internal-core-surface.md.",
+      "The umbrella is the stable, user-facing package, so nothing unstable may reach users through it.",
     ).not.toContain("@archwall/core/internal");
   });
 });

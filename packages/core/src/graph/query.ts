@@ -176,8 +176,6 @@ export interface ModuleSelection extends Iterable<ModuleNode> {
  * out-of-scope import target *is*, because an edge leaving the scope is the most interesting
  * thing it can find; hiding the target would turn `layer-dependencies` under a scope from a
  * finding into silence.
- *
- * See docs/adr/0013-scope-semantics.md.
  */
 export class GraphQuery {
   readonly #graph: ProjectGraph;
@@ -268,7 +266,6 @@ export class GraphQuery {
    *
    * Returns the graph's own array when nothing narrows it — it is already immutable, so a
    * defensive copy per call would protect nobody and cost a full edge list per rule.
-   * See docs/adr/0003-rule-visitor-model.md.
    */
   edges(filter?: EdgeFilter): readonly Edge[] {
     let all: readonly Edge[];

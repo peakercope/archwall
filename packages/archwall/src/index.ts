@@ -10,8 +10,6 @@
  * A star re-export cannot drift, which makes completeness an ongoing property rather than a
  * reconciliation someone has to remember. `@archwall/core/internal` is deliberately absent:
  * this is the stable package, and nothing unstable reaches users through it.
- *
- * See docs/adr/0018-public-and-internal-core-surface.md.
  */
 export * from "@archwall/core";
 export type {

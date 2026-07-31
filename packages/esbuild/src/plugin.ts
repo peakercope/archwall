@@ -39,8 +39,6 @@ const BASE_CAPABILITIES: Capability[] = ["dynamic-imports", "raw-specifiers"];
  *
  * The Rollup adapter has to claim this one *from evidence*, because `resolveId` is
  * first-wins: ordered after the resolvers it never observes what the author wrote
- * (docs/adr/0008-rollup-adapter-extraction.md).
- *
  * esbuild has no such hazard. The metafile is a record written after the fact, and it always
  * retains the pre-resolution specifier — as `original` when the import resolved elsewhere,
  * and as `path` itself when it did not. Plugin order cannot take it away, so claiming it

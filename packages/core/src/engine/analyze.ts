@@ -185,8 +185,7 @@ export async function analyze(
       repoRoot: config.repoRoot,
       relative,
       display: displayModuleId,
-      // The rule's OWN view, not the root one: a computation enumerates the graph, and
-      // enumeration is scoped. See docs/adr/0013-scope-semantics.md.
+      // The rule's OWN view, not the root one: a computation enumerates the graph, and enumeration is scoped.
       compute: (c) => cache.get(c, scopedQuery),
       report: (v) => {
         const locations = locationsOf(v);

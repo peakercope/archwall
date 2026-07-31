@@ -17,8 +17,6 @@ export const IR_VERSION = "1.0.0";
  * Producers report host facts; `GraphBuilder` decides identity — the same division
  * {@link ModuleKind} already uses. That is what makes a violation's fingerprint the same under
  * every bundler, which is what makes a baseline file possible at all.
- *
- * See docs/adr/0012-canonical-module-identity.md.
  */
 export type ModuleId = string;
 
@@ -192,8 +190,6 @@ export interface ProjectGraphInit {
  *
  * That is what keeps the *representation* out of the IR contract: a `ReadonlyMap` plus an
  * `Edge[]` is the current implementation, not the promise.
- *
- * See docs/adr/0002-opaque-project-graph.md.
  */
 export class ProjectGraph {
   readonly irVersion: string;
@@ -283,8 +279,6 @@ export class ProjectGraph {
  * A transform adds, patches, and removes; it never constructs a graph. That is what keeps
  * {@link ProjectGraph} opaque in practice rather than only in principle, and it means a
  * transform cannot drop an IR field it does not know about.
- *
- * See docs/adr/0002-opaque-project-graph.md.
  */
 export interface GraphMutation {
   /** Read side, mirroring {@link ProjectGraph}. */

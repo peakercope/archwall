@@ -5,7 +5,6 @@ import type { Violation, ViolationLocation } from "../violations.js";
 /**
  * Ids keep their scheme — a machine consumer wants the identity it can correlate against a
  * fingerprint or a baseline, not a prettified path
- * (docs/adr/0012-canonical-module-identity.md).
  *
  * `toRelative` is still applied, and is a no-op on a canonical id, which is never absolute. It
  * is here for the ids that are not canonical: an in-memory graph built by hand uses bare

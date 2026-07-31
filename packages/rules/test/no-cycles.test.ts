@@ -127,7 +127,6 @@ describe("no-cycles determinism", () => {
  * `no-cycles` is the rule that made the scope hole visible: it is one of the few that needs the
  * whole graph, so it reaches for `ctx.compute`, and a computation bound to the root query gave a
  * rule scoped to one app the cycles of the entire repository.
- * See docs/adr/0013-scope-semantics.md.
  */
 describe("no-cycles under a scope", () => {
   const twoApps = () =>

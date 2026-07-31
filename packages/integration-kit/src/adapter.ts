@@ -70,8 +70,6 @@ export interface Adapter {
  * and never formats a violation at all, because its reporters already did. Both would need
  * strategy callbacks for emission, payload, composition and containment — a shared helper
  * serving two shapes badly. They already share the real primitive, `formatViolation`.
- *
- * See docs/adr/0022-adapters-share-one-run-report-path.md.
  */
 export function createAdapter(options: AdapterOptions): Adapter {
   // Memoized across watch rebuilds so the config file is not re-transpiled every time. The
