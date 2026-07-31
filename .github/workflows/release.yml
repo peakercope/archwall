@@ -1,0 +1,63 @@
+# The filename matters. `release.yml` is registered as the workflow name on
+# each package's trusted-publisher config on npmjs.com, and npm checks it
+# against the OIDC claim. The publish must therefore run inline here - moving
+# it into a reusable workflow changes the claim and every publish 401s.
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # commit the version bump, push tags
+  pull-requests: write # open and update the version PR
+  id-token: write # OIDC token for npm trusted publishing
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          # Not 22: OIDC trusted publishing needs npm >= 11.5.1, and Node 22
+          # still bundles npm 10.x. Node 24 bundles npm 11.x.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false # never cache in release builds
+
+      - run: yarn install --immutable
+
+      # `version` builds nothing - it bumps the fixed group and writes the
+      # changelogs, then this action opens the PR. No lockfile refresh is
+      # needed: Yarn 4 records workspace packages as "0.0.0-use.local", a
+      # sentinel that real versions never invalidate.
+      # `publish` only runs once that PR is merged and no changesets remain;
+      # it rebuilds (dist/ is gitignored) and runs the pack smoke test before
+      # anything reaches the registry.
+      #
+      # Deliberately no NODE_AUTH_TOKEN: `changeset publish` shells out to
+      # `npm publish`, which mints its own short-lived token over OIDC. An
+      # empty NODE_AUTH_TOKEN in the environment turns that into a 401.
+      - uses: changesets/action@v1.9.0
+        with:
+          version: yarn version-packages
+          publish: yarn release
+          commit: "chore: version packages"
+          title: "chore: version packages"
+          # A fixed group tags every published package each release, so
+          # leaving this on would create a dozen GitHub Releases per version.
+          # CHANGELOG.md is the release record instead.
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

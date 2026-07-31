@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # engines declares ">=22". The floor catches accidental use of newer
+        # APIs; the ceiling is what the release job publishes from.
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v6
+
+      # .yarn/ has no committed Yarn release binary, so the version pinned by
+      # the root packageManager field has to be provisioned.
+      - run: corepack enable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: yarn
+
+      - run: yarn install --immutable
+
+      - run: yarn lint
+
+      - run: yarn typecheck
+
+      # Also enforces publint and attw - both run inside tsdown on every build.
+      - run: yarn build
+
+      - run: yarn test
+
+      # Packs all 13 packages, installs the tarballs outside the workspace and
+      # runs the real CLI against examples/clean-node. Needs network.
+      - run: yarn verify:pack

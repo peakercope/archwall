@@ -15,13 +15,17 @@
     "build": "tsdown",
     "build:watch": "tsdown --watch",
     "format": "biome check --write",
+    "lint": "biome ci",
     "test": "vitest run",
     "verify:pack": "node scripts/verify-pack.mjs",
-    "typecheck": "yarn workspaces foreach -A --exclude archwall-monorepo exec tsc --noEmit"
+    "typecheck": "yarn workspaces foreach -A --exclude archwall-monorepo exec tsc --noEmit",
+    "version-packages": "changeset version",
+    "release": "yarn build && yarn verify:pack && changeset publish"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
     "@biomejs/biome": "^2.5.5",
+    "@changesets/cli": "^2.31.1",
     "@types/node": "^24.13.3",
     "publint": "^0.3.22",
     "tsdown": "^0.22.14",

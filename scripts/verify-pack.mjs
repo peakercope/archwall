@@ -1,11 +1,17 @@
-// Verifies what consumers actually get: packs every workspace package, installs
-// the tarballs into a scratch project outside the workspace, then runs two
-// checks against that install.
+// Verifies what consumers actually get: packs every publishable workspace
+// package, installs the tarballs into a scratch project outside the workspace,
+// then runs three checks against that install. Private packages are skipped -
+// `changeset publish` filters them out too, so they are not part of "what
+// consumers get".
 //
-//   1. CJS load    - require() every dual-format package. Guards the format
+//   1. LICENSE     - every tarball carries the MIT text. Each manifest
+//                    declares "license": "MIT", and npm packs a LICENSE only
+//                    from the package's own directory - a root-only file
+//                    would ship in zero tarballs.
+//   2. CJS load    - require() every dual-format package. Guards the format
 //                    matrix in the design doc against a dependency going
 //                    ESM-only in a future major.
-//   2. CLI smoke   - run the real `archwall` binary against a copy of
+//   3. CLI smoke   - run the real `archwall` binary against a copy of
 //                    examples/clean-node. Exercises the compiled bin, its
 //                    shebang, the generated publishConfig, and cross-package
 //                    resolution between built artifacts.
@@ -15,9 +21,10 @@
 // would load core's src/index.ts, which imports "./errors.js" - a path that
 // only exists as .ts. Built output is only loadable once packed and installed.
 //
-// Why `overrides`: Yarn rewrites workspace:^ ranges to a plain "0.0.0" when it
-// packs, and 0.0.0 does not exist on the registry. Overrides pin every
-// @archwall/* dependency to its local tarball so nothing is fetched from npm.
+// Why `overrides`: Yarn resolves workspace:^ ranges to the current version
+// when it packs (e.g. "^0.1.0"), which is not on the registry until that
+// version is actually published. Overrides pin every @archwall/* dependency to
+// its local tarball so nothing is fetched from npm.
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
@@ -54,6 +61,7 @@ try {
 
   for (const dir of readdirSync(packagesDir).sort()) {
     const manifest = JSON.parse(readFileSync(path.join(packagesDir, dir, "package.json"), "utf8"));
+    if (manifest.private) continue;
     const tarball = path.join(tarballDir, `${dir}.tgz`);
     run("yarn", ["workspace", manifest.name, "pack", "--out", tarball], root);
     deps[manifest.name] = `file:${tarball}`;
@@ -83,7 +91,25 @@ try {
   console.log("installing tarballs...");
   run("npm", ["install", "--silent", "--no-audit", "--no-fund"], project);
 
-  // --- Check 1: every dual-format package loads as CommonJS -----------------
+  // --- Check 1: every tarball carries the MIT text --------------------------
+  // Compared byte-for-byte against the root LICENSE so a stale copy fails here
+  // rather than shipping a different licence to one package on npm.
+  const rootLicense = readFileSync(path.join(root, "LICENSE"), "utf8");
+  for (const name of names) {
+    const packed = path.join(project, "node_modules", name, "LICENSE");
+    let text;
+    try {
+      text = readFileSync(packed, "utf8");
+    } catch {
+      throw new Error(`${name}: no LICENSE in the tarball (expected packages/*/LICENSE)`);
+    }
+    if (text !== rootLicense) {
+      throw new Error(`${name}: LICENSE differs from the root LICENSE`);
+    }
+  }
+  console.log(`LICENSE: present and identical in ${names.length} tarball(s)`);
+
+  // --- Check 2: every dual-format package loads as CommonJS -----------------
   let checked = 0;
   let skipped = 0;
 
@@ -113,7 +139,7 @@ try {
   }
   console.log(`CJS load: ${checked} entrypoint(s) OK, ${skipped} ESM-only skipped`);
 
-  // --- Check 2: the real CLI binary against a copy of the example -----------
+  // --- Check 3: the real CLI binary against a copy of the example -----------
   // Copied into the scratch project so the config's `archwall` import resolves
   // to the installed tarball rather than back to workspace source.
   const example = path.join(root, "examples", "clean-node");

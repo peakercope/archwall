@@ -1,6 +1,7 @@
 {
   "name": "@archwall/test-utils",
   "version": "0.0.0",
+  "private": true,
   "description": "Fixture graph builders and violation assertions for testing ArchWall rules, presets, and classifiers.",
   "license": "MIT",
   "repository": {
