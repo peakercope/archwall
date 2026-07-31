@@ -1,6 +1,6 @@
 {
   "name": "@archwall/rules",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Built-in ArchWall rules: layer dependencies, forbidden dependencies, public API, deep imports, isolation, cycles, friend modules.",
   "license": "MIT",
   "repository": {

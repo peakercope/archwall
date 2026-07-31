@@ -1,6 +1,6 @@
 {
   "name": "@archwall/vite",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Vite adapter for ArchWall: the Rollup adapter in build, plus progressive dev-mode analysis.",
   "license": "MIT",
   "repository": {

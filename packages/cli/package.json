@@ -1,6 +1,6 @@
 {
   "name": "@archwall/cli",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Standalone ArchWall CLI: builds the project graph with its own resolver and runs the same engine, no bundler required.",
   "license": "MIT",
   "repository": {
