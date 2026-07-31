@@ -1,6 +1,6 @@
 {
   "name": "@archwall/rollup",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Rollup adapter for ArchWall, and the shared implementation for every Rollup-shaped host.",
   "license": "MIT",
   "repository": {
