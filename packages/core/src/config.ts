@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import type { Classifier } from "./contracts/classifier.js";
-import type { Diagnostic } from "./contracts/diagnostic.js";
+import type { Diagnostic, DiagnosticCode } from "./contracts/diagnostic.js";
 import type { Preset } from "./contracts/preset.js";
 import type { AnyConfiguredRule, Rule, RuleScope, RuleSettings } from "./contracts/rule.js";
 import type { GraphTransform } from "./contracts/transform.js";
@@ -51,6 +51,63 @@ export interface ResolvedFailOnDiagnostics {
   invalidOptions: boolean;
   invalidConfig: boolean;
   deprecated: boolean;
+}
+
+/**
+ * Which diagnostic codes each `failOnDiagnostics` switch governs, and whether it is on by
+ * default. The single source of truth for both.
+ *
+ * One table because there used to be three: the code list lived in `@archwall/integration-kit`,
+ * the defaults lived in `resolveConfig` below, and a second copy of the defaults lived beside
+ * the code list. Nothing linked them, so adding a gate meant remembering all three, and
+ * forgetting the third produced a switch that resolved correctly and then gated nothing.
+ *
+ * The `satisfies` is what keeps it honest: a key added to {@link ResolvedFailOnDiagnostics}
+ * and not here is a compile error, and vice versa.
+ */
+export const DIAGNOSTIC_GATES = {
+  ruleFailed: { codes: ["rule-failed"], default: true },
+  ruleSkipped: { codes: ["rule-skipped"], default: false },
+  emptyAnalysis: { codes: ["no-modules-classified", "empty-project"], default: false },
+  emptyScope: { codes: ["empty-scope"], default: false },
+  invalidOptions: { codes: ["invalid-rule-options"], default: true },
+  invalidConfig: { codes: ["invalid-config"], default: true },
+  deprecated: { codes: ["rule-deprecated"], default: false },
+} as const satisfies Record<
+  keyof ResolvedFailOnDiagnostics,
+  { codes: readonly DiagnosticCode[]; default: boolean }
+>;
+
+const GATE_KEYS = Object.keys(DIAGNOSTIC_GATES) as (keyof ResolvedFailOnDiagnostics)[];
+
+/**
+ * Applies {@link DIAGNOSTIC_GATES}' defaults to whatever the user left unset.
+ *
+ * Spelled out key by key rather than mapped over `GATE_KEYS`, so that adding a gate is a
+ * compile error here until it is handled. The values still come from the one table; only the
+ * exhaustiveness is restated, and restating it is the thing being bought.
+ */
+export function resolveFailOnDiagnostics(
+  user: FailOnDiagnostics | undefined,
+): ResolvedFailOnDiagnostics {
+  const gate = (key: keyof ResolvedFailOnDiagnostics): boolean =>
+    user?.[key] ?? DIAGNOSTIC_GATES[key].default;
+  return {
+    ruleFailed: gate("ruleFailed"),
+    ruleSkipped: gate("ruleSkipped"),
+    emptyAnalysis: gate("emptyAnalysis"),
+    emptyScope: gate("emptyScope"),
+    invalidOptions: gate("invalidOptions"),
+    invalidConfig: gate("invalidConfig"),
+    deprecated: gate("deprecated"),
+  };
+}
+
+/** The diagnostic codes that should fail a run, given the resolved gates. */
+export function failingDiagnosticCodes(gates: ResolvedFailOnDiagnostics): Set<DiagnosticCode> {
+  return new Set(
+    GATE_KEYS.filter((key) => gates[key]).flatMap((key) => DIAGNOSTIC_GATES[key].codes),
+  );
 }
 
 /**
@@ -509,15 +566,7 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
     rules,
     reporterSpecs,
     failOn: user.failOn ?? "error",
-    failOnDiagnostics: {
-      ruleFailed: user.failOnDiagnostics?.ruleFailed ?? true,
-      ruleSkipped: user.failOnDiagnostics?.ruleSkipped ?? false,
-      emptyAnalysis: user.failOnDiagnostics?.emptyAnalysis ?? false,
-      emptyScope: user.failOnDiagnostics?.emptyScope ?? false,
-      invalidOptions: user.failOnDiagnostics?.invalidOptions ?? true,
-      invalidConfig: user.failOnDiagnostics?.invalidConfig ?? true,
-      deprecated: user.failOnDiagnostics?.deprecated ?? false,
-    },
+    failOnDiagnostics: resolveFailOnDiagnostics(user.failOnDiagnostics),
     diagnostics,
   };
 }

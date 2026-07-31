@@ -1,14 +1,5 @@
-import type {
-  ArchWallRun,
-  Capability,
-  GraphTransform,
-  UserConfig,
-} from "@archwall/integration-kit";
-import {
-  createArchWallRun,
-  createModuleKindResolver,
-  formatViolation,
-} from "@archwall/integration-kit";
+import type { Capability, GraphTransform, UserConfig } from "@archwall/integration-kit";
+import { createAdapter, createModuleKindResolver } from "@archwall/integration-kit";
 import type { RollupPluginContextLike, RollupPluginLike } from "./rollup-types.js";
 
 export interface RollupAdapterOptions {
@@ -50,9 +41,26 @@ const BASE_CAPABILITIES: Capability[] = ["complete-graph", "dynamic-imports"];
  * specifier rules run; place it late and they skip loudly.
  */
 export function archwallRollup(options: RollupAdapterOptions = {}): RollupPluginLike {
-  let run: ArchWallRun | undefined;
   const rawSpecifiers = new Map<string, string>();
   const isEnabled = (): boolean => options.enabled?.() ?? true;
+  const adapter = createAdapter({
+    // Evidence, not intent: we saw the author's specifiers only if `resolveId` ran ahead of
+    // the resolvers. The run is memoized across watch rebuilds, so this is decided on the
+    // first build — which is also the first time there is anything to decide it from.
+    host: () => ({
+      name: options.host?.name ?? "rollup",
+      version: options.host?.version ?? "0.0.0",
+      capabilities: new Set([
+        ...BASE_CAPABILITIES,
+        ...(rawSpecifiers.size > 0 ? (["raw-specifiers"] as Capability[]) : []),
+        ...(options.capabilities ?? []),
+      ]),
+    }),
+    cwd: () => options.cwd?.() ?? process.cwd(),
+    config: options.config,
+    ...(options.transforms !== undefined ? { transforms: options.transforms } : {}),
+    enabled: isEnabled,
+  });
 
   return {
     name: "archwall",
@@ -67,71 +75,48 @@ export function archwallRollup(options: RollupAdapterOptions = {}): RollupPlugin
     },
 
     async buildEnd(this: RollupPluginContextLike) {
-      if (!isEnabled()) return;
-      const cwd = options.cwd?.() ?? process.cwd();
-      const transforms = options.transforms?.();
-      // Evidence, not intent: we saw the author's specifiers only if `resolveId` ran ahead
-      // of the resolvers. A run is memoized across watch rebuilds, so this is decided on
-      // the first build — which is also the first time there is anything to decide it from.
-      const observedSpecifiers = rawSpecifiers.size > 0;
-      run ??= await createArchWallRun({
-        host: {
-          name: options.host?.name ?? "rollup",
-          version: options.host?.version ?? "0.0.0",
-          capabilities: new Set([
-            ...BASE_CAPABILITIES,
-            ...(observedSpecifiers ? (["raw-specifiers"] as Capability[]) : []),
-            ...(options.capabilities ?? []),
-          ]),
-        },
-        cwd,
-        ...(transforms !== undefined && transforms.length > 0 ? { transforms } : {}),
-        ...(typeof options.config === "string" ? { configPath: options.config } : {}),
-        ...(typeof options.config === "object" ? { config: options.config } : {}),
+      const report = await adapter.check((builder, run) => {
+        const kinds = createModuleKindResolver({ sourceRoot: run.config.sourceRoot });
+        for (const id of this.getModuleIds()) {
+          const info = this.getModuleInfo(id);
+          if (!info) continue;
+          const file = id.startsWith("\0") ? null : (id.split("?")[0] ?? id);
+          builder.addModule({
+            id,
+            file,
+            // Facts only: the id, the file, and the host's own externality verdict where it
+            // still exists. What those add up to is not this adapter's decision.
+            ...kinds.infer({ id, file, isExternal: info.isExternal }),
+          });
+          for (const to of info.importedIds) {
+            builder.addEdge({
+              from: id,
+              to,
+              rawSpecifier: rawSpecifiers.get(`${id}\0${to}`) ?? to,
+              resolvedPath: to,
+              kind: "static",
+            });
+          }
+          for (const to of info.dynamicallyImportedIds) {
+            builder.addEdge({
+              from: id,
+              to,
+              rawSpecifier: rawSpecifiers.get(`${id}\0${to}`) ?? to,
+              resolvedPath: to,
+              kind: "dynamic",
+            });
+          }
+        }
       });
 
-      const builder = run.graphBuilder("complete");
-      const kinds = createModuleKindResolver({ sourceRoot: run.config.sourceRoot });
-      for (const id of this.getModuleIds()) {
-        const info = this.getModuleInfo(id);
-        if (!info) continue;
-        const file = id.startsWith("\0") ? null : (id.split("?")[0] ?? id);
-        builder.addModule({
-          id,
-          file,
-          // Facts only: the id, the file, and the host's own externality verdict where it
-          // still exists. What those add up to is not this adapter's decision.
-          ...kinds.infer({ id, file, isExternal: info.isExternal }),
-        });
-        for (const to of info.importedIds) {
-          builder.addEdge({
-            from: id,
-            to,
-            rawSpecifier: rawSpecifiers.get(`${id}\0${to}`) ?? to,
-            resolvedPath: to,
-            kind: "static",
-          });
-        }
-        for (const to of info.dynamicallyImportedIds) {
-          builder.addEdge({
-            from: id,
-            to,
-            rawSpecifier: rawSpecifiers.get(`${id}\0${to}`) ?? to,
-            resolvedPath: to,
-            kind: "dynamic",
-          });
-        }
-      }
-
-      const { failed, summary, result } = await run.check(builder.build());
-      // The map is per-build; keeping it would leak across watch rebuilds.
+      // The map is per-build; keeping it would leak across watch rebuilds. Cleared before
+      // the branch below, because `this.error` throws.
       rawSpecifiers.clear();
-      if (result.violations.length === 0) return;
-      const detail = result.violations.map((v) => formatViolation(v, result.repoRoot)).join("\n");
+      if (report === undefined) return;
       // Reporters have already run; this is the host-diagnostics channel, governed by
       // `failOn`.
-      if (failed) this.error(`${summary}\n${detail}`);
-      else this.warn(`${summary}\n${detail}`);
+      if (report.failed) this.error(report.text);
+      else this.warn(report.text);
     },
   };
 }

@@ -1,9 +1,5 @@
-import type { ArchWallRun, Capability, HostInfo, UserConfig } from "@archwall/integration-kit";
-import {
-  createArchWallRun,
-  createModuleKindResolver,
-  formatViolation,
-} from "@archwall/integration-kit";
+import type { Adapter, Capability, HostInfo, UserConfig } from "@archwall/integration-kit";
+import { createAdapter, createModuleKindResolver } from "@archwall/integration-kit";
 import type { CompilerLike } from "./bundler-types.js";
 import { addCompilationModules } from "./extract.js";
 
@@ -50,41 +46,42 @@ function hostOf(compiler: CompilerLike): HostInfo {
  */
 export class ArchWallPlugin {
   readonly #options: ArchWallPluginOptions;
-  /** Memoized so watch rebuilds don't re-transpile the config file every time. */
-  #run: Promise<ArchWallRun> | undefined;
+  /**
+   * Built in `apply`, not in the constructor: the host identity comes from the compiler, and
+   * one plugin instance may be applied to more than one. The adapter memoizes the run inside
+   * itself, so watch rebuilds still do not re-transpile the config file.
+   */
+  #adapter: Adapter | undefined;
 
   constructor(options: ArchWallPluginOptions = {}) {
     this.#options = options;
   }
 
   apply(compiler: CompilerLike): void {
-    const { config } = this.#options;
-    const makeRun = () =>
-      createArchWallRun({
-        host: hostOf(compiler),
-        cwd: compiler.context,
-        ...(typeof config === "string" ? { configPath: config } : {}),
-        ...(typeof config === "object" ? { config } : {}),
-      });
+    this.#adapter ??= createAdapter({
+      host: () => hostOf(compiler),
+      cwd: () => compiler.context,
+      config: this.#options.config,
+    });
+    const adapter = this.#adapter;
 
     compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation) => {
       compilation.hooks.finishModules.tapPromise(PLUGIN_NAME, async (modules) => {
-        this.#run ??= makeRun();
-        const run = await this.#run;
-        const builder = run.graphBuilder("complete");
-        const kinds = createModuleKindResolver({
-          sourceRoot: run.config.sourceRoot,
+        const report = await adapter.check((builder, run) => {
+          addCompilationModules(
+            builder,
+            compilation.moduleGraph,
+            modules,
+            createModuleKindResolver({ sourceRoot: run.config.sourceRoot }),
+          );
         });
-        addCompilationModules(builder, compilation.moduleGraph, modules, kinds);
+        if (report === undefined) return;
 
-        const { failed, summary, result } = await run.check(builder.build());
-        if (result.violations.length === 0) return;
-        const detail = result.violations.map((v) => formatViolation(v, result.repoRoot)).join("\n");
-        const diagnostic = new Error(`${summary}\n${detail}`);
+        const diagnostic = new Error(report.text);
         diagnostic.name = "ArchWallError";
         // Reporters have already run; this is the host-diagnostics channel, governed by
         // failOn. In watch mode an error marks the build failed without killing the watcher.
-        if (failed) compilation.errors.push(diagnostic);
+        if (report.failed) compilation.errors.push(diagnostic);
         else compilation.warnings.push(diagnostic);
       });
     });

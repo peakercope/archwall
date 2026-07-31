@@ -43,7 +43,8 @@ never edit history into agreement with the present.
 | [0015](0015-preset-is-the-plugin-type.md) | `Preset` is the plugin type |
 | [0016](0016-baselines-not-ignore-comments.md) | Baselines, not ignore comments *(proposed)* |
 | [0017](0017-projects-compose-scopes.md) | `projects` composes scopes *(proposed)* |
-| [0018](0018-public-and-internal-core-surface.md) | Public and internal core surface *(proposed)* |
+| [0018](0018-public-and-internal-core-surface.md) | Public and internal core surface |
 | [0019](0019-interest-boundary.md) | The interest boundary *(proposed)* |
 | [0020](0020-reporters-are-batch-only.md) | Reporters are batch-only |
 | [0021](0021-adapters-bake-their-ir-version.md) | Adapters bake their IR version at build time |
+| [0022](0022-adapters-share-one-run-report-path.md) | Adapters share one run/report path |

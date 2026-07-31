@@ -1,4 +1,11 @@
-export { GraphComputationCache } from "./analysis/cache.js";
+/**
+ * The public, frozen surface of `@archwall/core`. Adding a name here is a minor release;
+ * removing one is a major. Engine mechanics belong in `./internal.ts`, which carries no
+ * guarantee — see docs/adr/0018-public-and-internal-core-surface.md.
+ *
+ * `test/public-surface.test.ts` holds both halves to their frozen lists.
+ */
+
 export { stronglyConnectedComponents } from "./analysis/scc.js";
 export type { PathClassifierOptions, PathPattern } from "./classifiers/path.js";
 export { pathClassifier } from "./classifiers/path.js";
@@ -16,7 +23,13 @@ export type {
   RuleSpec,
   UserConfig,
 } from "./config.js";
-export { defineConfig, resolveConfig } from "./config.js";
+export {
+  DIAGNOSTIC_GATES,
+  defineConfig,
+  failingDiagnosticCodes,
+  resolveConfig,
+  resolveFailOnDiagnostics,
+} from "./config.js";
 export type { GraphComputation } from "./contracts/analysis.js";
 export { defineGraphComputation } from "./contracts/analysis.js";
 export type {
@@ -69,8 +82,6 @@ export type {
 } from "./contracts/transform.js";
 export { defineTransform } from "./contracts/transform.js";
 export { analyze } from "./engine/analyze.js";
-export type { BoundaryConfig, PrepareConfig, PrepareResult } from "./engine/prepare.js";
-export { applyProjectBoundary, prepareGraph } from "./engine/prepare.js";
 export { ArchWallError, IrVersionMismatchError } from "./errors.js";
 export type {
   Capability,
@@ -102,9 +113,8 @@ export {
   THIRD_PARTY_KINDS,
 } from "./graph/ir.js";
 export type { EdgeFilter, ModuleFilter, ModuleSelection } from "./graph/query.js";
-export { filterKey, GraphIndex, GraphQuery } from "./graph/query.js";
+export { GraphQuery } from "./graph/query.js";
 export { matchCaptures, matchesPattern } from "./match.js";
-export { hashParts, sourceRelative, stableHash, toRelative } from "./paths.js";
 export {
   consoleReporter,
   defaultIO,

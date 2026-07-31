@@ -1,5 +1,5 @@
 import type { Classifier, ModuleKind, ProjectGraph } from "@archwall/core";
-import { prepareGraph } from "@archwall/core";
+import { prepareGraph } from "@archwall/core/internal";
 import { buildFixtureGraph } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
 

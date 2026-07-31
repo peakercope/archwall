@@ -1,5 +1,5 @@
 import type { ModuleId, ModuleKind } from "@archwall/core";
-import { toRelative } from "@archwall/core";
+import { toRelative } from "@archwall/core/internal";
 import { packageNameFromPath } from "./module-path.js";
 import { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
 

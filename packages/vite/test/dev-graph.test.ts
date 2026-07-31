@@ -1,4 +1,4 @@
-import { prepareGraph } from "@archwall/core";
+import { prepareGraph } from "@archwall/core/internal";
 import { dropSelfEdges, GraphBuilder } from "@archwall/integration-kit";
 import type { DevModuleLike } from "@archwall/vite";
 import { addDevModules } from "@archwall/vite";

@@ -91,16 +91,27 @@ try {
     const installed = JSON.parse(
       readFileSync(path.join(project, "node_modules", name, "package.json"), "utf8"),
     );
-    if (!requireTarget(installed.exports?.["."])) {
+    // Every importable subpath, not just ".". @archwall/core/internal is production code
+    // for @archwall/cli and @archwall/integration-kit, so a subpath that resolves in the
+    // workspace but not in the tarball is a shipped break nothing else catches.
+    // "./package.json" is data, not a module.
+    const exported = installed.exports ?? {};
+    const subpaths = Object.keys(exported).filter(
+      (key) => key !== "./package.json" && requireTarget(exported[key]),
+    );
+    if (subpaths.length === 0) {
       console.log(`  - ${name}: ESM-only, skipped`);
       skipped++;
       continue;
     }
-    run(process.execPath, ["-e", `require(${JSON.stringify(name)})`], project);
-    console.log(`  v ${name}`);
-    checked++;
+    for (const subpath of subpaths) {
+      const specifier = subpath === "." ? name : `${name}/${subpath.slice(2)}`;
+      run(process.execPath, ["-e", `require(${JSON.stringify(specifier)})`], project);
+      console.log(`  v ${specifier}`);
+      checked++;
+    }
   }
-  console.log(`CJS load: ${checked} package(s) OK, ${skipped} ESM-only skipped`);
+  console.log(`CJS load: ${checked} entrypoint(s) OK, ${skipped} ESM-only skipped`);
 
   // --- Check 2: the real CLI binary against a copy of the example -----------
   // Copied into the scratch project so the config's `archwall` import resolves

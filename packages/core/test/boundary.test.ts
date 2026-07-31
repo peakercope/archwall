@@ -1,11 +1,6 @@
 import type { ModuleKind, ProjectGraph } from "@archwall/core";
-import {
-  analyze,
-  applyProjectBoundary,
-  configureRule,
-  defineRule,
-  resolveConfig,
-} from "@archwall/core";
+import { analyze, configureRule, defineRule, resolveConfig } from "@archwall/core";
+import { applyProjectBoundary } from "@archwall/core/internal";
 import { buildFixtureGraph } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
 

@@ -1,14 +1,5 @@
-import type {
-  ArchWallRun,
-  Capability,
-  GraphTransform,
-  UserConfig,
-} from "@archwall/integration-kit";
-import {
-  createArchWallRun,
-  createModuleKindResolver,
-  formatViolation,
-} from "@archwall/integration-kit";
+import type { Capability, GraphTransform, UserConfig } from "@archwall/integration-kit";
+import { createAdapter, createModuleKindResolver } from "@archwall/integration-kit";
 import type { EsbuildPluginLike, OnEndResultLike, PluginBuildLike } from "./esbuild-types.js";
 import { addMetafileModules } from "./extract.js";
 
@@ -64,9 +55,6 @@ const BASE_CAPABILITIES: Capability[] = ["dynamic-imports", "raw-specifiers"];
  * one, so the capability is claimed only when bundling is on.
  */
 export function archwallEsbuild(options: EsbuildAdapterOptions = {}): EsbuildPluginLike {
-  let run: ArchWallRun | undefined;
-  const isEnabled = (): boolean => options.enabled?.() ?? true;
-
   return {
     name: "archwall",
 
@@ -76,50 +64,46 @@ export function archwallEsbuild(options: EsbuildAdapterOptions = {}): EsbuildPlu
       // nobody reads is far cheaper than discovering at `onEnd` that there is none.
       build.initialOptions.metafile = true;
 
+      // Metafile keys are relative to `absWorkingDir`, so the SAME value must resolve them;
+      // anything else silently produces ids that match no file on disk.
+      const rootOf = (): string => build.initialOptions.absWorkingDir ?? process.cwd();
+      const adapter = createAdapter({
+        host: () => ({
+          name: options.host?.name ?? "esbuild",
+          version: options.host?.version ?? "0.0.0",
+          capabilities: new Set([
+            ...BASE_CAPABILITIES,
+            ...(build.initialOptions.bundle === true ? (["complete-graph"] as Capability[]) : []),
+            ...(options.capabilities ?? []),
+          ]),
+        }),
+        cwd: () => options.cwd?.() ?? rootOf(),
+        config: options.config,
+        ...(options.transforms !== undefined ? { transforms: options.transforms } : {}),
+        ...(options.enabled !== undefined ? { enabled: options.enabled } : {}),
+      });
+
       build.onEnd(async (result): Promise<OnEndResultLike | undefined> => {
-        if (!isEnabled()) return;
         const { metafile } = result;
         // A failed build, or a plugin that reset the option after this one ran.
         if (metafile === undefined) return;
 
-        // Metafile keys are relative to `absWorkingDir`, so the SAME value must resolve
-        // them; anything else silently produces ids that match no file on disk.
-        const root = build.initialOptions.absWorkingDir ?? process.cwd();
-        const transforms = options.transforms?.();
-        run ??= await createArchWallRun({
-          host: {
-            name: options.host?.name ?? "esbuild",
-            version: options.host?.version ?? "0.0.0",
-            capabilities: new Set([
-              ...BASE_CAPABILITIES,
-              ...(build.initialOptions.bundle === true ? (["complete-graph"] as Capability[]) : []),
-              ...(options.capabilities ?? []),
-            ]),
-          },
-          cwd: options.cwd?.() ?? root,
-          ...(transforms !== undefined && transforms.length > 0 ? { transforms } : {}),
-          ...(typeof options.config === "string" ? { configPath: options.config } : {}),
-          ...(typeof options.config === "object" ? { config: options.config } : {}),
+        const report = await adapter.check((builder, run) => {
+          addMetafileModules(
+            builder,
+            metafile,
+            createModuleKindResolver({ sourceRoot: run.config.sourceRoot }),
+            rootOf(),
+          );
         });
+        if (report === undefined) return;
 
-        const builder = run.graphBuilder("complete");
-        addMetafileModules(
-          builder,
-          metafile,
-          createModuleKindResolver({ sourceRoot: run.config.sourceRoot }),
-          root,
-        );
-
-        const { failed, summary, result: analysis } = await run.check(builder.build());
-        if (analysis.violations.length === 0) return;
-        const detail = analysis.violations
-          .map((v) => formatViolation(v, analysis.repoRoot))
-          .join("\n");
         // Reporters have already run; this is the host-diagnostics channel, governed by
         // `failOn`. An entry on `errors` fails the build — in watch mode without killing
         // the watcher — which is the esbuild analogue of Rollup's `this.error`.
-        const text = `${summary}\n${detail}`;
-        return failed ? { errors: [{ text }] } : { warnings: [{ text }] };
+        return report.failed
+          ? { errors: [{ text: report.text }] }
+          : { warnings: [{ text: report.text }] };
       });
     },
   };

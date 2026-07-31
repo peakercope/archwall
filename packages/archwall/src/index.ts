@@ -1,37 +1,19 @@
-export type {
-  AnalysisResult,
-  Capability,
-  Classifier,
-  ConfiguredRule,
-  Edge,
-  GraphComputation,
-  GraphQuery,
-  HostInfo,
-  ModuleId,
-  ModuleNode,
-  PathClassifierOptions,
-  PathPattern,
-  Preset,
-  PresetMeta,
-  ProjectGraph,
-  Reporter,
-  Rule,
-  RuleContext,
-  RuleOverride,
-  Severity,
-  UserConfig,
-  Violation,
-} from "@archwall/core";
-export {
-  configureRule,
-  defineClassifier,
-  defineConfig,
-  defineGraphComputation,
-  definePreset,
-  defineReporter,
-  defineRule,
-  pathClassifier,
-} from "@archwall/core";
+/**
+ * Everything public from core, wholesale.
+ *
+ * A hand-picked subset is how this package stopped being "the only one most users import":
+ * anyone needing one type that was not on the list added `@archwall/core` alongside, and the
+ * config file ended up with two import paths for one tool. It also mis-tagged `ProjectGraph`
+ * and `GraphQuery` — both classes — as `export type`, so `new ProjectGraph(...)` failed for
+ * umbrella users while looking perfectly correct in the source.
+ *
+ * A star re-export cannot drift, which makes completeness an ongoing property rather than a
+ * reconciliation someone has to remember. `@archwall/core/internal` is deliberately absent:
+ * this is the stable package, and nothing unstable reaches users through it.
+ *
+ * See docs/adr/0018-public-and-internal-core-surface.md.
+ */
+export * from "@archwall/core";
 export type {
   FsdOptions,
   LayeredOptions,

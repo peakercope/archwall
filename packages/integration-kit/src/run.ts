@@ -10,7 +10,14 @@ import type {
   ResolvedFailOnDiagnostics,
   UserConfig,
 } from "@archwall/core";
-import { analyze, countBySeverity, resolveConfig, resolveReporters } from "@archwall/core";
+import {
+  analyze,
+  countBySeverity,
+  failingDiagnosticCodes,
+  resolveConfig,
+  resolveFailOnDiagnostics,
+  resolveReporters,
+} from "@archwall/core";
 import { GraphBuilder } from "./graph-builder.js";
 import { loadConfig, materializeConfig } from "./load-config.js";
 import { nodeIO } from "./node-io.js";
@@ -45,33 +52,11 @@ export interface RunResult {
   summary: string;
 }
 
-/**
- * Diagnostic codes grouped by the `failOnDiagnostics` switch that governs them.
- *
- * NOTE: a new gate has to be added in three places — here, in `DEFAULT_GATES` below, and in
- * `resolveConfig`'s defaults in `@archwall/core`. Nothing links them at compile time beyond
- * `keyof ResolvedFailOnDiagnostics`, which catches a missing key here but not a missing
- * default. Consolidating them is surface work that belongs with the M3 freeze.
- */
-const DIAGNOSTIC_GATES: Record<keyof ResolvedFailOnDiagnostics, readonly string[]> = {
-  ruleFailed: ["rule-failed"],
-  ruleSkipped: ["rule-skipped"],
-  emptyAnalysis: ["no-modules-classified", "empty-project"],
-  emptyScope: ["empty-scope"],
-  invalidOptions: ["invalid-rule-options"],
-  invalidConfig: ["invalid-config"],
-  deprecated: ["rule-deprecated"],
-};
-
 function failingDiagnostics(
   result: AnalysisResult,
   gates: ResolvedFailOnDiagnostics,
 ): readonly Diagnostic[] {
-  const codes = new Set(
-    (Object.keys(DIAGNOSTIC_GATES) as (keyof ResolvedFailOnDiagnostics)[])
-      .filter((k) => gates[k])
-      .flatMap((k) => DIAGNOSTIC_GATES[k]),
-  );
+  const codes = failingDiagnosticCodes(gates);
   return result.diagnostics.filter((d) => codes.has(d.code));
 }
 
@@ -89,15 +74,8 @@ export interface ArchWallRun {
   check(graph: ProjectGraph): Promise<RunResult>;
 }
 
-const DEFAULT_GATES: ResolvedFailOnDiagnostics = {
-  ruleFailed: true,
-  ruleSkipped: false,
-  emptyAnalysis: false,
-  emptyScope: false,
-  invalidOptions: true,
-  invalidConfig: true,
-  deprecated: false,
-};
+/** Core's own defaults, so a caller that passes no gates gets what `resolveConfig` would. */
+const DEFAULT_GATES: ResolvedFailOnDiagnostics = resolveFailOnDiagnostics(undefined);
 
 /**
  * The single definition of pass/fail and of the one-line summary. Two implementations of
