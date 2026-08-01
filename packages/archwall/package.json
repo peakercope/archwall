@@ -1,6 +1,6 @@
 {
   "name": "archwall",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "ArchWall umbrella package: defineConfig, the built-in presets, and the define* helpers.",
   "license": "MIT",
   "repository": {
@@ -18,9 +18,9 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "^0.2.0",
-    "@archwall/presets": "^0.2.0",
-    "@archwall/rules": "^0.2.0"
+    "@archwall/core": "^0.2.1",
+    "@archwall/presets": "^0.2.1",
+    "@archwall/rules": "^0.2.1"
   },
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",

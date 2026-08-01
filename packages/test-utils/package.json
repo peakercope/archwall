@@ -1,6 +1,6 @@
 {
   "name": "@archwall/test-utils",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Fixture graph builders and violation assertions for testing ArchWall rules, presets, and classifiers.",
   "keywords": [
     "archwall",
@@ -24,7 +24,7 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "^0.2.0"
+    "@archwall/core": "^0.2.1"
   },
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
