@@ -1,6 +1,6 @@
 {
   "name": "@archwall/vite",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Vite adapter for ArchWall: the Rollup adapter in build, plus progressive dev-mode analysis.",
   "license": "MIT",
   "repository": {
@@ -17,15 +17,15 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@archwall/integration-kit": "^0.2.0",
-    "@archwall/rollup": "^0.2.0"
+    "@archwall/integration-kit": "^0.2.1",
+    "@archwall/rollup": "^0.2.1"
   },
   "peerDependencies": {
     "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"
   },
   "devDependencies": {
-    "@archwall/core": "^0.2.0",
-    "@archwall/presets": "^0.2.0",
+    "@archwall/core": "^0.2.1",
+    "@archwall/presets": "^0.2.1",
     "vite": "^8.1.5"
   },
   "exports": {

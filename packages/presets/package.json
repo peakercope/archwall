@@ -1,6 +1,6 @@
 {
   "name": "@archwall/presets",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Built-in architecture presets for ArchWall: Feature-Sliced Design, layered (Clean/Onion/Hexagonal), and independent modules.",
   "license": "MIT",
   "repository": {
@@ -18,11 +18,11 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "^0.2.0",
-    "@archwall/rules": "^0.2.0"
+    "@archwall/core": "^0.2.1",
+    "@archwall/rules": "^0.2.1"
   },
   "devDependencies": {
-    "@archwall/test-utils": "^0.2.0"
+    "@archwall/test-utils": "^0.2.1"
   },
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",

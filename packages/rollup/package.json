@@ -1,6 +1,6 @@
 {
   "name": "@archwall/rollup",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Rollup adapter for ArchWall, and the shared implementation for every Rollup-shaped host.",
   "license": "MIT",
   "repository": {
@@ -17,7 +17,7 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@archwall/integration-kit": "^0.2.0"
+    "@archwall/integration-kit": "^0.2.1"
   },
   "peerDependencies": {
     "rollup": "^4.0.0"
@@ -39,8 +39,8 @@
     }
   },
   "devDependencies": {
-    "@archwall/presets": "^0.2.0",
-    "@archwall/rules": "^0.2.0",
+    "@archwall/presets": "^0.2.1",
+    "@archwall/rules": "^0.2.1",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "rollup": "^4.62.4",

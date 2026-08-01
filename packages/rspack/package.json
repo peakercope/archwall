@@ -1,6 +1,6 @@
 {
   "name": "@archwall/rspack",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Rspack and webpack adapter for ArchWall: validates the real module graph at finishModules.",
   "license": "MIT",
   "repository": {
@@ -18,7 +18,7 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/bundler-plugin": "^0.2.0"
+    "@archwall/bundler-plugin": "^0.2.1"
   },
   "peerDependencies": {
     "@rspack/core": "^2.0.0",
@@ -33,7 +33,7 @@
     }
   },
   "devDependencies": {
-    "@archwall/presets": "^0.2.0",
+    "@archwall/presets": "^0.2.1",
     "@rspack/core": "^2.1.6",
     "@swc/core": "^1.15.46",
     "swc-loader": "^0.2.7",

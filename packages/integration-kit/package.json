@@ -1,6 +1,6 @@
 {
   "name": "@archwall/integration-kit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Adapter SDK for ArchWall integrations: GraphBuilder, run lifecycle, config loading, diagnostics, conformance harness.",
   "license": "MIT",
   "repository": {
@@ -18,12 +18,12 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "^0.2.0",
+    "@archwall/core": "^0.2.1",
     "jiti": "^2.7.0"
   },
   "devDependencies": {
-    "@archwall/presets": "^0.2.0",
-    "@archwall/test-utils": "^0.2.0",
+    "@archwall/presets": "^0.2.1",
+    "@archwall/test-utils": "^0.2.1",
     "react": "^19.2.8"
   },
   "module": "./dist/index.mjs",

@@ -1,6 +1,6 @@
 {
   "name": "@archwall/bundler-plugin",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shared ArchWall plugin for bundlers exposing webpack's compilation API (Rspack, webpack).",
   "license": "MIT",
   "repository": {
@@ -18,7 +18,7 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/integration-kit": "^0.2.0"
+    "@archwall/integration-kit": "^0.2.1"
   },
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
