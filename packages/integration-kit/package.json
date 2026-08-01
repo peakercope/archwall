@@ -1,6 +1,6 @@
 {
   "name": "@archwall/integration-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Adapter SDK for ArchWall integrations: GraphBuilder, run lifecycle, config loading, diagnostics, conformance harness.",
   "license": "MIT",
   "repository": {

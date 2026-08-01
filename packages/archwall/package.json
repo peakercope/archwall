@@ -1,6 +1,6 @@
 {
   "name": "archwall",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ArchWall umbrella package: defineConfig, the built-in presets, and the define* helpers.",
   "license": "MIT",
   "repository": {

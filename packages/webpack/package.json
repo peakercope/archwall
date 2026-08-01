@@ -1,6 +1,6 @@
 {
   "name": "@archwall/webpack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "webpack adapter for ArchWall: re-exports the shared Rspack/webpack plugin under a webpack-shaped name.",
   "license": "MIT",
   "repository": {

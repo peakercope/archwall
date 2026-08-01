@@ -1,6 +1,6 @@
 {
   "name": "@archwall/esbuild",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "esbuild adapter for ArchWall: builds the project graph from the build's metafile.",
   "license": "MIT",
   "repository": {

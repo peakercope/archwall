@@ -1,5 +1,12 @@
 # @archwall/esbuild
 
+## 0.2.0
+
+### Patch Changes
+
+- Updated dependencies [1321ebb]
+  - @archwall/integration-kit@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
