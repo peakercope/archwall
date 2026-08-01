@@ -16,6 +16,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@archwall/bundler-plugin@workspace:packages/bundler-plugin"
   dependencies:
+    "@archwall/core": "npm:^0.2.1"
     "@archwall/integration-kit": "npm:^0.2.1"
   languageName: unknown
   linkType: soft
@@ -52,7 +53,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@archwall/core@npm:^0.2.1, @archwall/core@workspace:packages/core":
+"@archwall/core@npm:^0.2.1, @archwall/core@workspace:^, @archwall/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@archwall/core@workspace:packages/core"
   dependencies:
@@ -88,6 +89,8 @@ __metadata:
     "@archwall/test-utils": "npm:^0.2.1"
     jiti: "npm:^2.7.0"
     react: "npm:^19.2.8"
+  peerDependencies:
+    "@archwall/core": ^0.2.1
   languageName: unknown
   linkType: soft
 
@@ -98,6 +101,8 @@ __metadata:
     "@archwall/core": "npm:^0.2.1"
     "@archwall/rules": "npm:^0.2.1"
     "@archwall/test-utils": "npm:^0.2.1"
+  peerDependencies:
+    "@archwall/core": ^0.2.1
   languageName: unknown
   linkType: soft
 
@@ -105,6 +110,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@archwall/rollup@workspace:packages/rollup"
   dependencies:
+    "@archwall/core": "npm:^0.2.1"
     "@archwall/integration-kit": "npm:^0.2.1"
     "@archwall/presets": "npm:^0.2.1"
     "@archwall/rules": "npm:^0.2.1"
@@ -126,6 +132,7 @@ __metadata:
   resolution: "@archwall/rspack@workspace:packages/rspack"
   dependencies:
     "@archwall/bundler-plugin": "npm:^0.2.1"
+    "@archwall/core": "npm:^0.2.1"
     "@archwall/presets": "npm:^0.2.1"
     "@rspack/core": "npm:^2.1.6"
     "@swc/core": "npm:^1.15.46"
@@ -148,6 +155,8 @@ __metadata:
   dependencies:
     "@archwall/core": "npm:^0.2.1"
     "@archwall/test-utils": "npm:^0.2.1"
+  peerDependencies:
+    "@archwall/core": ^0.2.1
   languageName: unknown
   linkType: soft
 
@@ -156,6 +165,8 @@ __metadata:
   resolution: "@archwall/test-utils@workspace:packages/test-utils"
   dependencies:
     "@archwall/core": "npm:^0.2.1"
+  peerDependencies:
+    "@archwall/core": ^0.2.1
   languageName: unknown
   linkType: soft
 
@@ -2422,6 +2433,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "archwall-example-vite@workspace:examples/vite"
   dependencies:
+    "@archwall/core": "workspace:^"
     "@archwall/rules": "workspace:^"
     "@archwall/vite": "workspace:^"
     archwall: "workspace:^"

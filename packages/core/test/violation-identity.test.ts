@@ -110,6 +110,85 @@ describe("violation fingerprints", () => {
   });
 });
 
+/**
+ * What a committed baseline SURVIVES, and what it does not.
+ *
+ * Both halves are the contract. A baseline is a long-lived artifact that outlives the refactor
+ * that follows it, so "this entry stopped matching" has to be a fact someone decided rather
+ * than something they discover in CI.
+ */
+describe("baseline entry stability", () => {
+  const withEdge = (over: { rawSpecifier?: string; kind?: string; hostName?: string }) =>
+    buildFixtureGraph({
+      modules: [
+        { id: "/proj/src/a.ts", file: "/proj/src/a.ts" },
+        { id: "/proj/src/b.ts", file: "/proj/src/b.ts" },
+      ],
+      edges: [
+        {
+          from: "/proj/src/a.ts",
+          to: "/proj/src/b.ts",
+          rawSpecifier: over.rawSpecifier ?? "./b",
+          ...(over.kind !== undefined ? { kind: over.kind } : {}),
+        },
+      ],
+      ...(over.hostName !== undefined ? { hostName: over.hostName } : {}),
+    });
+
+  const fingerprint = async (graph: ReturnType<typeof withEdge>, cwd = "/proj") =>
+    (await analyze(graph, resolveConfig({ rules: [configureRule(flagEdges)] }, { cwd })))
+      .violations[0]!.fingerprint;
+
+  it("survives an alias rewritten to a relative specifier", async () => {
+    // Vite expands an alias before any plugin sees it; the CLI does not. Including the raw
+    // specifier would make one architectural fact fingerprint differently per bundler.
+    expect(await fingerprint(withEdge({ rawSpecifier: "@/b" }))).toBe(
+      await fingerprint(withEdge({ rawSpecifier: "./b" })),
+    );
+  });
+
+  it("survives an edge reclassified from static to reexport", async () => {
+    // `reexport` versus `static` is capability-gated, so a host that gains the capability
+    // must not invalidate every entry about that edge.
+    expect(await fingerprint(withEdge({ kind: "reexport" }))).toBe(
+      await fingerprint(withEdge({ kind: "static" })),
+    );
+  });
+
+  it("survives a change of host", async () => {
+    expect(await fingerprint(withEdge({ hostName: "vite" }))).toBe(
+      await fingerprint(withEdge({ hostName: "cli" })),
+    );
+  });
+
+  it("does NOT survive moving the file — a documented limitation", async () => {
+    // Identity is (rule instance, locations), and a moved file IS a different location. Worth
+    // asserting rather than assuming: it is what a team hits on their first big refactor, and
+    // the answer is `--update-baseline`, not a bug report.
+    const moved = buildFixtureGraph({
+      modules: [
+        { id: "/proj/src/moved/a.ts", file: "/proj/src/moved/a.ts" },
+        { id: "/proj/src/b.ts", file: "/proj/src/b.ts" },
+      ],
+      edges: [{ from: "/proj/src/moved/a.ts", to: "/proj/src/b.ts", rawSpecifier: "../b" }],
+    });
+    expect(await fingerprint(moved)).not.toBe(await fingerprint(withEdge({})));
+  });
+
+  it("does NOT survive renaming the rule instance", async () => {
+    // The instance id is half the identity, which is what keeps two instances of one rule at
+    // different scopes from sharing baseline entries.
+    const renamed = await analyze(
+      withEdge({}),
+      resolveConfig(
+        { rules: [configureRule(flagEdges, {}, { id: "flag-edges-web" })] },
+        { cwd: "/proj" },
+      ),
+    );
+    expect(renamed.violations[0]!.fingerprint).not.toBe(await fingerprint(withEdge({})));
+  });
+});
+
 describe("deterministic ordering", () => {
   it("sorts violations independently of module insertion order", async () => {
     const forward = buildFixtureGraph({

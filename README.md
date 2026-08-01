@@ -155,6 +155,10 @@ archwall check [--config path] [--reporter <name>] [--output <dest>] [--fail-on 
 # `--reporter` and `--output` pair up positionally, so machine-readable output
 # gets its own file and stdout is never contaminated by the human summary:
 archwall check --reporter console --reporter sarif --output archwall.sarif
+
+# Turning it on for the first time on an existing codebase: accept what is there
+# today, so only NEW violations fail the build.
+archwall check --update-baseline
 ```
 
 The summary line always goes to **stderr**, so `--reporter json > out.json` produces a file
@@ -298,7 +302,7 @@ which specifier a finding was about.
 
 - **Type-only imports are visible only under the CLI.** `import type` is erased before any bundler graph exists, so no bundler adapter can report it. The CLI lexes source, so it does report those edges — labelled `attributes.typeOnly` and gated by the `type-only-edges` capability, so a rule about them skips loudly under a host that cannot supply them rather than silently matching nothing. Whether an erased import counts as a dependency is yours to decide: layering rules usually want to see them, `no-cycles` usually does not, so apply `dropTypeOnlyEdges()` where you want them gone. Per-specifier `import { type A }` is not detected — that needs a parser, not a lexer, and such an edge is reported as an ordinary value edge.
 - No auto-fixing, no runtime (browser) enforcement.
-- **No baseline file yet.** Adopting ArchWall on an existing codebase reports everything at once, and a graph-based linter has no source text in which to put an ignore comment. Violation fingerprints ship now so the baseline can land later without changing violation identity, and the shapes it will use are already reserved: `AnalysisResult.suppressed`, `UserConfig.baseline`, and the `baseline-stale` diagnostic gate all exist and are inert, so no frozen type has to change when suppression lands.
+- **A baseline is the only suppression mechanism.** A graph-based linter has no source text, so there is no `// archwall-ignore` and there never will be. Accepted findings live in a committed file keyed on violation fingerprints — see [**adopting ArchWall on an existing codebase**](docs/guides/brownfield-adoption.md). A baseline entry does not survive moving or renaming the file it is about; it does survive reworded messages, rewritten aliases, and a change of bundler.
 - **The CLI reads JavaScript and TypeScript only.** `.vue`, `.svelte`, and `.astro` files inside the project boundary cannot be lexed, so they are absent from the graph — but no longer silently: the run reports an `unscannable-files` diagnostic naming the count, extensions, and example paths. Turn on `failOnDiagnostics.unscannableFiles` to make it fail, or run ArchWall through your bundler, whose compiler already knows how to read them.
 - The full inventory of what static dependency analysis can and cannot prove — including why Nx-style project tags and DDD aggregate boundaries are out of scope — is in [`docs/presets/limitations.md`](docs/presets/limitations.md).
 - **`no-deep-imports` does not run under Vite.** Vite 8 expands aliases before any plugin observes an import, so the adapter cannot see what the author wrote and does not claim `raw-specifiers`; the rule is skipped with a diagnostic rather than silently matching nothing. Use the CLI, Rspack/webpack, or a Rollup build with the plugin ordered first — or `public-api`, which enforces the same intent from the graph side.

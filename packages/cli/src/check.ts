@@ -8,6 +8,8 @@ export interface CheckOptions {
   /** Inline config; wins over the discovered file. */
   config?: UserConfig;
   io?: ReporterIO;
+  /** Rewrite the configured baseline from this run, accepting every finding. */
+  updateBaseline?: boolean;
 }
 
 export async function check(opts: CheckOptions = {}): Promise<RunResult> {
@@ -22,5 +24,8 @@ export async function check(opts: CheckOptions = {}): Promise<RunResult> {
   const { graph, diagnostics } = await buildGraphFromFilesystem(run.config, host);
   // Producer diagnostics go through the run edge's own channel, so they land in
   // `result.diagnostics` and are gated by `failOnDiagnostics` like every other kind.
-  return run.check(graph, { diagnostics });
+  return run.check(graph, {
+    diagnostics,
+    ...(opts.updateBaseline === true ? { updateBaseline: true } : {}),
+  });
 }

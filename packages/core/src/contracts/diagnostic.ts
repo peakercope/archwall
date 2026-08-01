@@ -43,7 +43,18 @@ export type WellKnownDiagnosticCode =
    * "debt we accepted" and becomes a permanent hole, and the stale entry will silently
    * re-suppress the finding if it ever comes back.
    */
-  | "baseline-stale";
+  | "baseline-stale"
+  /**
+   * A baseline is configured but could not be used: missing, unparseable, or written under a
+   * different fingerprint scheme.
+   *
+   * Gated with the other configuration errors, and therefore failing by default. The failure
+   * this prevents is specific: an unusable baseline suppresses nothing, so the run reports
+   * every accepted finding as new — and a team that reads that as "the baseline is broken"
+   * is the lucky case. Silence here would instead let a *scheme bump* look like a fresh
+   * regression, or let a deleted baseline look like a clean repo.
+   */
+  | "baseline-invalid";
 
 export type DiagnosticCode = WellKnownDiagnosticCode | (string & {});
 
@@ -78,6 +89,22 @@ export interface UnscannableFilesDetails {
   extensions: readonly string[];
   /** A bounded sample of repo-relative paths, for a message a human can follow. */
   sample: readonly string[];
+}
+
+/** Payload shape for `code: "baseline-stale"`. */
+export interface BaselineStaleDetails {
+  /** How many accepted entries this run did not reproduce. */
+  count: number;
+  /** The fingerprints, so a tool can prune the file without re-running the analysis. */
+  fingerprints: readonly string[];
+}
+
+/** Payload shape for `code: "baseline-invalid"`. */
+export interface BaselineInvalidDetails {
+  /** Repo-relative path to the configured baseline. */
+  path: string;
+  /** Why it could not be used, as a sentence fragment. */
+  reason: string;
 }
 
 /** Payload shape for `code: "empty-scope"`. */

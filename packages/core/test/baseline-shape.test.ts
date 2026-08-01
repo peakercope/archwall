@@ -3,12 +3,14 @@ import { buildFixtureGraph } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
 
 /**
- * The baseline contract, reserved ahead of its implementation.
+ * The baseline contract as seen from the ENGINE.
  *
- * These shapes are on FROZEN types (`AnalysisResult`, `UserConfig`, `ResolvedFailOnDiagnostics`),
- * so the moment to get them right is before they are frozen, not after. What is asserted here is
- * that they exist, resolve, and are inert — a guard against the field quietly changing meaning
- * between now and the release that honours it.
+ * Suppression is implemented at the run edge (`@archwall/integration-kit`), never here: it is
+ * policy, exactly like `failOn`, and an engine that filtered its own output would make
+ * `result.violations` mean different things to different callers. So what these assert is that
+ * `analyze` stays inert about baselines — it resolves the path, it declares the field, and it
+ * suppresses nothing. `test/baseline.test.ts` covers the file format; the run-edge behaviour
+ * lives in `@archwall/integration-kit`'s `test/baseline.test.ts`.
  */
 
 const graph = () =>
@@ -17,10 +19,18 @@ const graph = () =>
     edges: [["/repo/a.ts", "/repo/b.ts"]],
   });
 
-describe("reserved baseline contract", () => {
-  it("gives every result a `suppressed` list, empty until suppression is implemented", async () => {
+describe("baseline contract in the engine", () => {
+  it("gives every result a `suppressed` list, which the engine itself never fills", async () => {
     const result = await analyze(graph(), resolveConfig({}, { cwd: "/repo" }));
     expect(result.suppressed).toEqual([]);
+  });
+
+  it("does not suppress even when a baseline is configured — that is the run edge's job", async () => {
+    const config = resolveConfig({ baseline: "baseline.json" }, { cwd: "/repo" });
+    const result = await analyze(graph(), config);
+    expect(result.suppressed).toEqual([]);
+    // And it does not go looking for the file either: core has no filesystem by construction.
+    expect(result.diagnostics.filter((d) => d.code === "baseline-invalid")).toEqual([]);
   });
 
   it("resolves `baseline` to an absolute path against repoRoot", () => {

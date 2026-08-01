@@ -18,10 +18,13 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "^0.2.1",
     "jiti": "^2.7.0"
   },
+  "peerDependencies": {
+    "@archwall/core": "^0.2.1"
+  },
   "devDependencies": {
+    "@archwall/core": "^0.2.1",
     "@archwall/presets": "^0.2.1",
     "@archwall/test-utils": "^0.2.1",
     "react": "^19.2.8"

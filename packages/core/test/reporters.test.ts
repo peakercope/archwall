@@ -23,6 +23,9 @@ const violation: Violation = {
 };
 const result: AnalysisResult = {
   violations: [violation],
+  // Always present on a real result, empty when no baseline is configured. Reporters may read
+  // it unconditionally, which is the point of it not being optional.
+  suppressed: [],
   diagnostics: [
     {
       code: "rule-skipped",

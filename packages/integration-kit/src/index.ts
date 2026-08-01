@@ -49,6 +49,8 @@ export {
 } from "@archwall/core";
 export type { Adapter, AdapterOptions, AdapterReport } from "./adapter.js";
 export { createAdapter } from "./adapter.js";
+export type { ReadBaselineResult } from "./baseline-file.js";
+export { readBaseline, writeBaseline } from "./baseline-file.js";
 export type { CanonicalIdInput, CanonicalIdOptions } from "./canonical-id.js";
 export { canonicalModuleId, identifiesAFile } from "./canonical-id.js";
 export type {

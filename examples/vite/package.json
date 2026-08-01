@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@archwall/core": "workspace:^",
     "@archwall/rules": "workspace:^",
     "@archwall/vite": "workspace:^",
     "archwall": "workspace:^",

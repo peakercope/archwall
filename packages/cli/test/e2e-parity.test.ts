@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import { check } from "@archwall/cli";
-import type { Preset, Reporter, UserConfig, Violation } from "@archwall/core";
+import type { BaselineFile, Preset, Reporter, UserConfig, Violation } from "@archwall/core";
+import { applyBaseline, parseBaseline, serializeBaseline } from "@archwall/core";
 import archwallEsbuild from "@archwall/esbuild";
 import { primaryEdge, primaryModule } from "@archwall/integration-kit";
 import { fsd, layered, modules } from "@archwall/presets";
@@ -245,5 +246,49 @@ describe("fingerprint stability across producers", () => {
       reporters: [],
     });
     expect(all.vite).toContain("layered/purity-domain|file:src/domain/rules.ts|pkg:react");
+  }, 240_000);
+
+  /**
+   * The claim a baseline actually rests on, closed end to end.
+   *
+   * Equal fingerprints across producers is the premise; this is the conclusion — a file
+   * committed by a developer running Vite suppresses in CI running the standalone CLI. If this
+   * ever fails, a team's baseline silently stops working the moment their CI and their laptop
+   * disagree about which bundler ran.
+   */
+  it("lets a baseline written under one producer suppress under every other", async () => {
+    const collected: Record<string, Violation[]> = {};
+    const capture = (host: string): Reporter => ({
+      name: "capture",
+      onRunEnd: (r) => {
+        collected[host] = [...r.violations];
+      },
+    });
+    const name = "fsd-app";
+    const { dir, src } = fixture(name);
+    const shared: UserConfig = { sourceRoot: "src", presets: [fsd()], failOn: "never" };
+
+    await build({
+      root: dir,
+      logLevel: "silent",
+      configFile: false,
+      plugins: [archwallVite({ config: { ...shared, reporters: [capture("vite")] } })],
+      resolve: { alias: { "@": src } },
+      build: { write: false, rollupOptions: { input: path.join(src, "main.ts") } },
+    });
+    await check({
+      cwd: dir,
+      config: { ...shared, reporters: [capture("cli")] },
+      io: { open: () => ({ write: () => {} }) },
+    });
+
+    expect(collected.vite!.length).toBeGreaterThan(0);
+    // Written by Vite, applied to the CLI's findings — the direction a real team hits.
+    const written = parseBaseline(serializeBaseline(collected.vite!, dir));
+    expect(written).not.toHaveProperty("error");
+    const applied = applyBaseline(collected.cli!, (written as { file: BaselineFile }).file);
+    expect(applied.violations).toEqual([]);
+    expect(applied.stale).toEqual([]);
+    expect(applied.suppressed).toHaveLength(collected.cli!.length);
   }, 240_000);
 });

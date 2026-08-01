@@ -7,6 +7,13 @@
  */
 
 export { stronglyConnectedComponents } from "./analysis/scc.js";
+export type {
+  AppliedBaseline,
+  BaselineEntry,
+  BaselineFile,
+  BaselineParseResult,
+} from "./baseline.js";
+export { applyBaseline, parseBaseline, serializeBaseline } from "./baseline.js";
 export type { PathClassifierOptions, PathPattern } from "./classifiers/path.js";
 export { pathClassifier } from "./classifiers/path.js";
 export type {
@@ -39,6 +46,8 @@ export type {
 } from "./contracts/classifier.js";
 export { defineClassifier } from "./contracts/classifier.js";
 export type {
+  BaselineInvalidDetails,
+  BaselineStaleDetails,
   Diagnostic,
   DiagnosticCode,
   DiagnosticSeverity,

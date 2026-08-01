@@ -37,7 +37,10 @@ export interface FailOnDiagnostics {
   emptyScope?: boolean;
   /** A rule's options failed its schema, so the rule did not run. Default true. */
   invalidOptions?: boolean;
-  /** The configuration itself is wrong and something was dropped. Default true. */
+  /**
+   * The configuration itself is wrong and something was dropped, or a configured baseline
+   * could not be read. Default true.
+   */
   invalidConfig?: boolean;
   /** A configured rule is deprecated. Default false. */
   deprecated?: boolean;
@@ -90,7 +93,10 @@ export const DIAGNOSTIC_GATES = {
   emptyAnalysis: { codes: ["no-modules-classified", "empty-project"], default: false },
   emptyScope: { codes: ["empty-scope"], default: false },
   invalidOptions: { codes: ["invalid-rule-options"], default: true },
-  invalidConfig: { codes: ["invalid-config"], default: true },
+  // `baseline-invalid` rides the config gate rather than getting its own: a baseline that
+  // cannot be read is a broken configuration, and the two want the same answer — fail, loudly,
+  // before anyone reads the violation count as meaningful.
+  invalidConfig: { codes: ["invalid-config", "baseline-invalid"], default: true },
   deprecated: { codes: ["rule-deprecated"], default: false },
   unscannableFiles: { codes: ["unscannable-files"], default: false },
   baselineStale: { codes: ["baseline-stale"], default: false },
@@ -227,8 +233,9 @@ export interface UserConfig {
   /**
    * Path to a baseline file of accepted violations, relative to {@link repoRoot}.
    *
-   * RESERVED — declared, resolved, and carried on `ResolvedConfig`, but not yet read. See
-   * `AnalysisResult.suppressed`.
+   * Read at the RUN EDGE, not by `analyze` — suppression is policy, like `failOn`, and the
+   * engine stays pure. Matched findings move to `AnalysisResult.suppressed`. Write the file
+   * with `archwall check --update-baseline`.
    *
    * A graph-based linter has no other suppression mechanism available: with no source text
    * there can be no `// archwall-ignore`, so accepting existing findings has to be a file
@@ -261,7 +268,7 @@ export interface ResolvedRule {
 export interface ResolvedConfig {
   /** Absolute. Base for reported paths and fingerprints. */
   repoRoot: string;
-  /** Absolute path to the baseline file, or null. RESERVED; see {@link UserConfig.baseline}. */
+  /** Absolute path to the baseline file, or null when none is configured. */
   baseline: string | null;
   /** Absolute, at or below {@link repoRoot}. Base for the boundary and classifiers. */
   sourceRoot: string;

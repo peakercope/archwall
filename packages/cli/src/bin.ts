@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import * as path from "node:path";
 import { parseArgs } from "node:util";
 import type { FailOn, ReporterSpec, UserConfig } from "@archwall/core";
 import { loadConfig } from "@archwall/integration-kit";
@@ -10,6 +11,7 @@ const USAGE = `Usage: archwall check [options]
   --reporter <name>        Reporter to run; repeatable (console, json, sarif, or a package)
   --output <dest>          Where the preceding --reporter writes: a file path, stdout, stderr
   --fail-on <level>        error | warn | never
+  --update-baseline        Rewrite the configured baseline, accepting every current finding
   --cwd <dir>              Directory to resolve the config and sources from
   --help
 
@@ -58,6 +60,7 @@ async function main(): Promise<void> {
       reporter: { type: "string", multiple: true },
       output: { type: "string", multiple: true },
       "fail-on": { type: "string" },
+      "update-baseline": { type: "boolean" },
       cwd: { type: "string" },
       help: { type: "boolean" },
     },
@@ -86,9 +89,21 @@ async function main(): Promise<void> {
     ...(specs.length > 0 ? { reporters: specs } : {}),
     ...(values["fail-on"] !== undefined ? { failOn: values["fail-on"] as FailOn } : {}),
   };
-  const { failed, summary } = await check({ cwd, config });
+  const updateBaseline = values["update-baseline"] === true;
+  if (updateBaseline && config.baseline === undefined) {
+    console.error(
+      "--update-baseline needs a `baseline` path in your config — there is nowhere to write.",
+    );
+    process.exitCode = 2;
+    return;
+  }
+
+  const { failed, summary, baselineWritten } = await check({ cwd, config, updateBaseline });
   // stderr, always: a machine-readable reporter owns stdout, and commentary sharing that
   // stream is what makes `--reporter json > out.json` produce something that is not JSON.
+  if (baselineWritten !== undefined) {
+    console.error(`archwall: wrote baseline ${path.relative(cwd, baselineWritten)}`);
+  }
   console.error(summary);
   process.exitCode = failed ? 1 : 0;
 }

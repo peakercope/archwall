@@ -16,6 +16,7 @@ import { diffSymbols, readBarrelSurface } from "./support/exported-symbols.js";
  */
 const PUBLIC_VALUES = [
   "analyze",
+  "applyBaseline",
   "ArchWallError",
   "assertIrCompatible",
   "BUILTIN_REPORTER_NAMES",
@@ -51,6 +52,7 @@ const PUBLIC_VALUES = [
   "matchCaptures",
   "matchesPattern",
   "MODULE_ID_SCHEMES",
+  "parseBaseline",
   "parseModuleId",
   "pathClassifier",
   "primaryEdge",
@@ -62,6 +64,7 @@ const PUBLIC_VALUES = [
   "resolveFailOnDiagnostics",
   "resolveReporters",
   "sarifReporter",
+  "serializeBaseline",
   "stronglyConnectedComponents",
   "THIRD_PARTY_KINDS",
 ].toSorted();
@@ -75,6 +78,12 @@ const PUBLIC_TYPES = [
   "AnalysisResult",
   "AnalysisStats",
   "AnalyzeOptions",
+  "AppliedBaseline",
+  "BaselineEntry",
+  "BaselineFile",
+  "BaselineInvalidDetails",
+  "BaselineParseResult",
+  "BaselineStaleDetails",
   "BuiltinReporterName",
   "CallableRule",
   "Capability",

@@ -77,16 +77,25 @@ export function consoleReporter(sink: OutputSink): Reporter {
       for (const v of result.violations) sink.write(formatViolation(v, result.repoRoot));
       // A violation's most useful next step is the rule's documentation; print it once per
       // rule that actually fired rather than on every line.
+      //
+      // Keyed on what was PRINTED, not on `RuleRunInfo.violations` — that is the count the rule
+      // produced, which still includes findings a baseline suppressed. Keying on it left a fully
+      // suppressed run printing bare documentation links above "0 error(s)", pointing at nothing.
+      const printed = new Set(result.violations.map((v) => v.ruleId));
       const docs = new Map(
         result.rules
-          .filter((r) => r.docsUrl !== undefined && r.violations > 0)
+          .filter((r) => r.docsUrl !== undefined && printed.has(r.id))
           .map((r) => [r.id, r.docsUrl!]),
       );
       for (const [id, url] of docs) sink.write(`  ${id}: ${url}`);
       for (const d of result.diagnostics) sink.write(`${d.severity}: ${d.message}`);
       const { error, warn, info } = countBySeverity(result.violations);
+      // The suppressed count is printed, never hidden: a baseline is debt, and debt you cannot
+      // see is debt nobody pays down. It also makes "0 error(s)" honest about what it counted.
+      const suppressed =
+        result.suppressed.length > 0 ? `, ${result.suppressed.length} suppressed` : "";
       sink.write(
-        `${error} error(s), ${warn} warning(s)${info > 0 ? `, ${info} info` : ""} — ${result.stats.moduleCount} modules, ${result.stats.edgeCount} edges in ${Math.round(result.stats.durationMs)}ms`,
+        `${error} error(s), ${warn} warning(s)${info > 0 ? `, ${info} info` : ""}${suppressed} — ${result.stats.moduleCount} modules, ${result.stats.edgeCount} edges in ${Math.round(result.stats.durationMs)}ms`,
       );
     },
   };
