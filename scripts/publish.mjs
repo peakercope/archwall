@@ -112,6 +112,17 @@ const published = (name, version) => {
   }
 };
 
+// The check above can be a step behind the registry: a version published
+// minutes earlier still reads as 404 while the packument propagates, which is
+// how the release that followed the @archwall/test-utils bootstrap "failed" on
+// the package it had just claimed. npm rejects a re-publish with E403 and this
+// exact complaint, so the upload itself is the reliable answer - the registry
+// is the authority on what it already holds. Matched on the message rather
+// than the code: E403 also covers the very different "2FA required, token
+// specified", which is a real failure.
+const alreadyOnRegistry = (detail) =>
+  detail.includes("cannot publish over the previously published version");
+
 const pending = ordered.filter((pkg) => {
   if (published(pkg.name, pkg.version)) {
     console.log(`skip  ${pkg.name}@${pkg.version} (already on registry)`);
@@ -136,6 +147,7 @@ const tarballDir = mkdtempSync(path.join(tmpdir(), "archwall-publish-"));
 // before their dependents, so anything that can go out does, and the run still
 // exits non-zero with every failure named at the end.
 const failures = [];
+const raced = [];
 
 try {
   for (const pkg of pending) {
@@ -167,6 +179,13 @@ try {
       ]
         .filter(Boolean)
         .join("\n");
+
+      if (alreadyOnRegistry(detail)) {
+        console.log(`skip  ${pkg.name}@${pkg.version} (already on registry, pre-check read stale)`);
+        raced.push(pkg);
+        continue;
+      }
+
       console.error(`\nFAILED ${pkg.name}@${pkg.version}:\n${detail}\n`);
       failures.push(pkg);
     }
@@ -175,7 +194,7 @@ try {
   rmSync(tarballDir, { recursive: true, force: true });
 }
 
-const succeeded = pending.length - failures.length;
+const succeeded = pending.length - failures.length - raced.length;
 console.log(
   dryRun
     ? `\nDry run: ${succeeded} package(s) would be published.`
