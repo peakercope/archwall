@@ -40,9 +40,10 @@
     "@swc/core": "^1.15.46",
     "@types/picomatch": "^4.0.3",
     "esbuild": "^0.28.1",
-    "rollup": "^4.62.3",
+    "rollup": "^4.62.4",
     "swc-loader": "^0.2.7",
     "tslib": "^2.8.1",
+    "typescript": "^6.0.3",
     "vite": "^8.1.5",
     "webpack": "^5.109.1"
   },
