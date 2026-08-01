@@ -69,7 +69,16 @@ export type WellKnownCapability =
    * that matches on specifiers must require this, or it silently matches nothing on hosts
    * that cannot supply them and reports a clean run rather than an unavailable one.
    */
-  | "raw-specifiers";
+  | "raw-specifiers"
+  /**
+   * Type-only edges are PRESENT and carry `attributes.typeOnly`. See {@link EdgeAttributes}.
+   *
+   * A rule that treats type-only imports differently must require this. Without it, a host
+   * that erases type imports (every bundler does) is indistinguishable from one where the
+   * code genuinely has no type imports — and "no `attributes.typeOnly` anywhere" would be
+   * read as "nothing is type-only" rather than "nobody asked".
+   */
+  | "type-only-edges";
 
 /**
  * Open union: adapters may declare capabilities core does not know about, and rules may
@@ -95,11 +104,45 @@ export interface SourceLocation {
 export type WellKnownEdgeKind = "static" | "dynamic" | "reexport";
 
 /**
- * Open union so future graph facts (CSS imports, worker edges, type-only edges) arrive
- * additively. Consumers must treat an unrecognised kind as "some dependency exists" —
- * never assume exhaustiveness.
+ * Open union so future graph facts (CSS imports, worker edges) arrive additively. Consumers
+ * must treat an unrecognised kind as "some dependency exists" — never assume exhaustiveness.
+ *
+ * `kind` answers ONE question — roughly "what syntax produced this edge" — and deliberately
+ * keeps answering only that. Everything else an edge might be belongs in
+ * {@link EdgeAttributes}; see the note there for why.
  */
 export type EdgeKind = WellKnownEdgeKind | (string & {});
+
+/**
+ * Orthogonal facts about an edge, as an OPEN bag.
+ *
+ * `kind` is one enum, but the domain is not one-dimensional. `export type * from "./x"` is
+ * *both* a re-export and type-only; a dynamic import of a barrel is both dynamic and a
+ * re-export. Modelling those as one enum forces every producer to pick a winner, and forces
+ * every consumer to guess which axis the winner came from.
+ *
+ * So the axes split: `kind` keeps the syntactic one, and everything else lands here, where it
+ * composes. A bag rather than named fields because the next axis is always unknown — import
+ * attributes (`with { type: "json" }`), worker edges, CSS edges, `require` vs `import`
+ * interop — and each one arriving as a new top-level `Edge` field would be a new IR major.
+ *
+ * **Absent means "the host did not say", never "false".** That distinction is the whole
+ * reason {@link WellKnownCapability} has `type-only-edges`: a bundler that erased type imports
+ * before ArchWall saw them reports nothing here, and a rule must be able to tell that apart
+ * from a codebase with no type imports in it.
+ */
+export interface EdgeAttributes {
+  /**
+   * The import is erased at compile time (`import type`, `export type`, or an
+   * `import { type X }` specifier where every named binding is type-only).
+   *
+   * Requires the `type-only-edges` capability to be meaningful. `true` or absent — never
+   * `false`, so that a producer cannot accidentally assert the negative it does not know.
+   */
+  typeOnly?: true;
+  /** Third parties and future core versions extend here without an IR major. */
+  [key: string]: string | true | undefined;
+}
 
 /**
  * What a module *is*, relative to the project being analysed.
@@ -167,9 +210,21 @@ export interface Edge {
   kind: EdgeKind;
   /** Present only if host capability allows. */
   loc?: SourceLocation;
+  /** Orthogonal facts; see {@link EdgeAttributes}. Absent when the host reported none. */
+  attributes?: EdgeAttributes;
 }
 
 export type GraphDelivery = "complete" | "progressive";
+
+/**
+ * Process-local counter behind {@link ProjectGraphInit.revision}.
+ *
+ * A fresh number per constructed graph is the conservative choice: a consumer keying a cache
+ * on `revision` can only ever be told "this is a different graph", never falsely told it is
+ * the same one. Content-addressed revisions would enable cache HITS across rebuilds, which is
+ * the incremental-validation problem and deliberately not solved here.
+ */
+let revisionCounter = 0;
 
 export interface ProjectGraphInit {
   host: HostInfo;
@@ -179,6 +234,14 @@ export interface ProjectGraphInit {
   edges: readonly Edge[];
   /** Default {@link IR_VERSION}. Adapters should leave this alone. */
   irVersion?: string;
+  /**
+   * Opaque identity for this graph. Defaults to a fresh process-local number.
+   *
+   * The contract is one-directional and deliberately weak: **equal revisions mean the same
+   * graph; unequal revisions mean nothing.** Set it explicitly only if you can guarantee the
+   * first half — a producer that content-hashes its inputs, for instance.
+   */
+  revision?: number;
 }
 
 /**
@@ -195,6 +258,12 @@ export class ProjectGraph {
   readonly irVersion: string;
   readonly host: HostInfo;
   readonly delivery: GraphDelivery;
+  /**
+   * See {@link ProjectGraphInit.revision}. Preserved across {@link replaceStores}, because a
+   * derived graph is a deterministic function of this one and the config that derived it —
+   * so a cache keyed on `(revision, configKey)` stays sound through the prepare pipeline.
+   */
+  readonly revision: number;
   readonly #modules: ReadonlyMap<ModuleId, ModuleNode>;
   readonly #edges: readonly Edge[];
 
@@ -202,12 +271,14 @@ export class ProjectGraph {
     irVersion: string,
     host: HostInfo,
     delivery: GraphDelivery,
+    revision: number,
     modules: ReadonlyMap<ModuleId, ModuleNode>,
     edges: readonly Edge[],
   ) {
     this.irVersion = irVersion;
     this.host = host;
     this.delivery = delivery;
+    this.revision = revision;
     this.#modules = modules;
     this.#edges = edges;
   }
@@ -221,6 +292,7 @@ export class ProjectGraph {
       init.irVersion ?? IR_VERSION,
       init.host,
       init.delivery ?? "complete",
+      init.revision ?? ++revisionCounter,
       modules,
       init.edges,
     );
@@ -267,6 +339,7 @@ export class ProjectGraph {
       this.irVersion,
       this.host,
       this.delivery,
+      this.revision,
       modules,
       edges ?? this.#edges,
     );

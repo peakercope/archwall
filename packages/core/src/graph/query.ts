@@ -19,6 +19,16 @@ export interface EdgeFilter {
   toTag?: Record<string, string>;
   /** Tag key; keep edge iff BOTH endpoints have the tag and values differ. */
   crossing?: string;
+  /**
+   * Selects on {@link EdgeAttributes}. `true` requires the attribute present; `false` requires
+   * it ABSENT; a string requires that exact value.
+   *
+   * `false` and "absent" are the same test on purpose — attributes are never stored as `false`
+   * (see {@link EdgeAttributes}), so "not type-only" and "nobody said" are indistinguishable
+   * *here* by construction. A rule that must tell them apart declares the corresponding
+   * capability and gets skipped loudly instead, which is the only honest answer.
+   */
+  attributes?: Readonly<Record<string, string | boolean>>;
 }
 
 function matchesKind(m: ModuleNode, want: ModuleKind | readonly ModuleKind[]): boolean {
@@ -153,7 +163,42 @@ export interface ModuleSelection extends Iterable<ModuleNode> {
 }
 
 /**
- * The only sanctioned way to read a graph.
+ * The read surface a rule gets — and the type it should name.
+ *
+ * An INTERFACE rather than the class, because the two are different promises. What ArchWall
+ * owes a rule author is a set of questions that can be asked about a graph; what it must stay
+ * free to change is how those questions are answered. Naming the class in `RuleContext` fused
+ * the two: the concrete implementation became observable via `instanceof`, a test double became
+ * impossible to supply, and an interned or columnar store became a breaking change rather than
+ * an optimisation.
+ *
+ * {@link GraphQuery} is the only implementation core ships, and it lives in
+ * `@archwall/core/internal`. Rules never construct one — they are handed one — so nothing is
+ * taken away by that; a rule author who needs one for a TEST gets it from
+ * `@archwall/test-utils`, which is the supported way to build a graph by hand.
+ *
+ * See {@link GraphQuery} for what scope does to each of these operations.
+ */
+export interface GraphView {
+  module(id: ModuleId): ModuleNode | undefined;
+  moduleCount(): number;
+  moduleIds(): Iterable<ModuleId>;
+  has(id: ModuleId): boolean;
+  tagOf(id: ModuleId, key: string): string | undefined;
+  modules(filter?: ModuleFilter): ModuleSelection;
+  edges(filter?: EdgeFilter): readonly Edge[];
+  edgesOutOf(id: ModuleId): readonly Edge[];
+  edgesInto(id: ModuleId): readonly Edge[];
+  reachableFrom(id: ModuleId, filter?: EdgeFilter): ReadonlySet<ModuleId>;
+  reaching(id: ModuleId, filter?: EdgeFilter): ReadonlySet<ModuleId>;
+  pathBetween(from: ModuleId, to: ModuleId, filter?: EdgeFilter): readonly ModuleId[] | null;
+  filterEdges(edges: readonly Edge[], filter?: EdgeFilter): readonly Edge[];
+  matchesEdge(e: Edge, filter: EdgeFilter): boolean;
+  matchesModule(m: ModuleNode, filter: ModuleFilter): boolean;
+}
+
+/**
+ * The only sanctioned way to read a graph; the sole implementation of {@link GraphView}.
  *
  * A scoped query is a VIEW: it shares the underlying {@link GraphIndex} with the query it
  * came from and differs only in which modules it is *about*.
@@ -177,7 +222,7 @@ export interface ModuleSelection extends Iterable<ModuleNode> {
  * thing it can find; hiding the target would turn `layer-dependencies` under a scope from a
  * finding into silence.
  */
-export class GraphQuery {
+export class GraphQuery implements GraphView {
   readonly #graph: ProjectGraph;
   readonly #index: GraphIndex;
   /** When present, the ANCHOR set: which modules this view is about. See the class doc. */
@@ -369,6 +414,16 @@ export class GraphQuery {
       const a = from?.tags.get(filter.crossing);
       const b = to?.tags.get(filter.crossing);
       if (a === undefined || b === undefined || a === b) return false;
+    }
+    if (filter.attributes !== undefined) {
+      for (const [key, want] of Object.entries(filter.attributes)) {
+        const has = e.attributes?.[key];
+        if (want === false) {
+          if (has !== undefined) return false;
+        } else if (want === true) {
+          if (has === undefined) return false;
+        } else if (has !== want) return false;
+      }
     }
     return true;
   }

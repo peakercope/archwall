@@ -19,6 +19,8 @@ export async function check(opts: CheckOptions = {}): Promise<RunResult> {
     ...(opts.config !== undefined ? { config: opts.config } : {}),
     ...(opts.io !== undefined ? { io: opts.io } : {}),
   });
-  const graph = await buildGraphFromFilesystem(run.config, host);
-  return run.check(graph);
+  const { graph, diagnostics } = await buildGraphFromFilesystem(run.config, host);
+  // Producer diagnostics go through the run edge's own channel, so they land in
+  // `result.diagnostics` and are gated by `failOnDiagnostics` like every other kind.
+  return run.check(graph, { diagnostics });
 }

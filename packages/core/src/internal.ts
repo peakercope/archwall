@@ -22,5 +22,5 @@ export { GraphComputationCache } from "./analysis/cache.js";
 export type { BoundaryConfig, PrepareConfig, PrepareResult } from "./engine/prepare.js";
 export { applyProjectBoundary, prepareGraph } from "./engine/prepare.js";
 export { GraphDraft } from "./graph/ir.js";
-export { filterKey, GraphIndex } from "./graph/query.js";
+export { filterKey, GraphIndex, GraphQuery } from "./graph/query.js";
 export { hashParts, sourceRelative, stableHash, toRelative } from "./paths.js";

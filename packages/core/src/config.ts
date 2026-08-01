@@ -41,6 +41,23 @@ export interface FailOnDiagnostics {
   invalidConfig?: boolean;
   /** A configured rule is deprecated. Default false. */
   deprecated?: boolean;
+  /**
+   * In-boundary files the producer could not read, and so never analysed. Default false.
+   *
+   * Default false only because turning it on would fail CI for every Vue/Svelte/Astro project
+   * the moment they upgrade, and a warning they can see beats an error they revert. Turn it on
+   * in any repository where "ArchWall looked at all of it" is load-bearing — which, for a tool
+   * whose whole failure mode is passing green without looking, is most of them.
+   */
+  unscannableFiles?: boolean;
+  /**
+   * The baseline contains entries this run did not match. Default false.
+   *
+   * False by default because the common cause is the good one — somebody fixed something — and
+   * failing CI for that punishes exactly the behaviour the baseline exists to encourage. Teams
+   * that want the file kept honest turn it on and prune as they go.
+   */
+  baselineStale?: boolean;
 }
 
 export interface ResolvedFailOnDiagnostics {
@@ -51,6 +68,8 @@ export interface ResolvedFailOnDiagnostics {
   invalidOptions: boolean;
   invalidConfig: boolean;
   deprecated: boolean;
+  unscannableFiles: boolean;
+  baselineStale: boolean;
 }
 
 /**
@@ -73,6 +92,8 @@ export const DIAGNOSTIC_GATES = {
   invalidOptions: { codes: ["invalid-rule-options"], default: true },
   invalidConfig: { codes: ["invalid-config"], default: true },
   deprecated: { codes: ["rule-deprecated"], default: false },
+  unscannableFiles: { codes: ["unscannable-files"], default: false },
+  baselineStale: { codes: ["baseline-stale"], default: false },
 } as const satisfies Record<
   keyof ResolvedFailOnDiagnostics,
   { codes: readonly DiagnosticCode[]; default: boolean }
@@ -100,6 +121,8 @@ export function resolveFailOnDiagnostics(
     invalidOptions: gate("invalidOptions"),
     invalidConfig: gate("invalidConfig"),
     deprecated: gate("deprecated"),
+    unscannableFiles: gate("unscannableFiles"),
+    baselineStale: gate("baselineStale"),
   };
 }
 
@@ -201,6 +224,18 @@ export interface UserConfig {
    * `{ reporter, output }` to send one somewhere other than stdout. Default ["console"].
    */
   reporters?: ReporterSpec[];
+  /**
+   * Path to a baseline file of accepted violations, relative to {@link repoRoot}.
+   *
+   * RESERVED — declared, resolved, and carried on `ResolvedConfig`, but not yet read. See
+   * `AnalysisResult.suppressed`.
+   *
+   * A graph-based linter has no other suppression mechanism available: with no source text
+   * there can be no `// archwall-ignore`, so accepting existing findings has to be a file
+   * keyed on violation fingerprints. That is what makes ArchWall adoptable on a codebase that
+   * did not start with it — the alternative is 400 violations on day one and an uninstall.
+   */
+  baseline?: string;
   /** Which VIOLATION severity gates the run. `info` findings never fail it. */
   failOn?: FailOn;
   /** Which DIAGNOSTICS gate the run, regardless of `failOn`. */
@@ -226,6 +261,8 @@ export interface ResolvedRule {
 export interface ResolvedConfig {
   /** Absolute. Base for reported paths and fingerprints. */
   repoRoot: string;
+  /** Absolute path to the baseline file, or null. RESERVED; see {@link UserConfig.baseline}. */
+  baseline: string | null;
   /** Absolute, at or below {@link repoRoot}. Base for the boundary and classifiers. */
   sourceRoot: string;
   include: string[];
@@ -554,6 +591,10 @@ export function resolveConfig(user: UserConfig, opts?: { cwd?: string }): Resolv
 
   return {
     repoRoot,
+    // Resolved against the REPO root, like everything else that names a file a human wrote
+    // down — a baseline is committed next to the config, not relative to whatever cwd CI
+    // happened to invoke the tool from.
+    baseline: user.baseline !== undefined ? path.resolve(repoRoot, user.baseline) : null,
     // Relative to the repo root, not to cwd: the two roots describe one nested tree, and
     // resolving them independently would let them drift apart under a different cwd.
     sourceRoot: path.resolve(repoRoot, user.sourceRoot ?? "."),

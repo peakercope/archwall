@@ -1,6 +1,7 @@
 import type {
   Capability,
   Edge,
+  EdgeAttributes,
   EdgeKind,
   GraphDelivery,
   ModuleId,
@@ -31,6 +32,8 @@ export interface FixtureEdge {
   /** Default "static". */
   kind?: EdgeKind;
   loc?: SourceLocation;
+  /** Orthogonal edge facts, e.g. `{ typeOnly: true }`. Omitted when absent. */
+  attributes?: EdgeAttributes;
 }
 
 export interface FixtureGraphOptions {
@@ -75,6 +78,7 @@ export function buildFixtureGraph(opts: FixtureGraphOptions): ProjectGraph {
       resolvedPath: e.resolvedPath ?? e.to,
       kind: e.kind ?? "static",
       ...(e.loc !== undefined ? { loc: e.loc } : {}),
+      ...(e.attributes !== undefined ? { attributes: e.attributes } : {}),
     };
   });
   return ProjectGraph.create({

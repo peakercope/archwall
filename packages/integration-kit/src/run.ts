@@ -60,6 +60,24 @@ function failingDiagnostics(
   return result.diagnostics.filter((d) => codes.has(d.code));
 }
 
+/** Per-check knobs. Mirrors core's `AnalyzeOptions`, plus what only the run edge can carry. */
+export interface RunCheckOptions {
+  /**
+   * Diagnostics the PRODUCER discovered while building the graph.
+   *
+   * Passed per check rather than folded into `config.diagnostics`, because the run — and
+   * therefore its config — is memoized across watch rebuilds: appending there would
+   * accumulate a duplicate on every rebuild for the life of the process.
+   *
+   * The channel exists because only a producer that enumerates a tree can find some problems
+   * at all — the CLI's `unscannable-files` being the motivating case — and a producer with
+   * nowhere to report has no choice but to stay silent.
+   */
+  diagnostics?: readonly Diagnostic[];
+  /** Forwarded to `analyze`; aborts the run between rules. */
+  signal?: AbortSignal;
+}
+
 export interface ArchWallRun {
   config: ResolvedConfig;
   configFile: string | null;
@@ -71,7 +89,7 @@ export interface ArchWallRun {
    * and this is the impure edge around it — it opens sinks, drives reporters, and decides
    * pass/fail. One word for both was the reason nobody could tell which one a call site meant.
    */
-  check(graph: ProjectGraph): Promise<RunResult>;
+  check(graph: ProjectGraph, options?: RunCheckOptions): Promise<RunResult>;
 }
 
 /** Core's own defaults, so a caller that passes no gates gets what `resolveConfig` would. */
@@ -140,9 +158,14 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
         ...(delivery !== undefined ? { delivery } : {}),
       });
     },
-    async check(graph) {
+    async check(graph, checkOptions) {
       const startedAt = Date.now();
       const runId = `${startedAt}-${++runCounter}`;
+      const extra = checkOptions?.diagnostics ?? [];
+      // A fresh config per check when there are producer diagnostics — never a mutation of the
+      // memoized one, which every subsequent rebuild would then inherit.
+      const effective: ResolvedConfig =
+        extra.length > 0 ? { ...config, diagnostics: [...config.diagnostics, ...extra] } : config;
       // Built-ins are constructed PER RUN. The run object is memoized across watch rebuilds
       // in the bundler adapters, so a reporter built once here outlives every rebuild — and
       // any per-run state it holds accumulates for the life of the process. Reporters the
@@ -152,7 +175,11 @@ export async function createArchWallRun(opts: CreateRunOptions): Promise<ArchWal
         for (const r of reporters) {
           await r.onRunStart?.({ runId, host: graph.host, startedAt, repoRoot: config.repoRoot });
         }
-        const result = await analyze(graph, config);
+        const result = await analyze(
+          graph,
+          effective,
+          checkOptions?.signal !== undefined ? { signal: checkOptions.signal } : {},
+        );
         // Awaited: a reporter that writes a file or flushes a socket must complete before
         // the caller acts on the result (the CLI sets an exit code immediately after).
         for (const r of reporters) await r.onRunEnd(result);

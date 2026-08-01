@@ -118,6 +118,19 @@ export interface GraphSnapshotOptions {
    * and it changes what `no-cycles` reports.
    */
   edgeKinds?: "exact" | "coarse";
+  /**
+   * Whether type-only edges take part in the comparison. `"exclude"` is the default.
+   *
+   * Exactly the `reexport` argument, one axis over: `type-only-edges` is a declared
+   * capability, and only a producer that reads source can honour it — every bundler erases
+   * `import type` long before a plugin hook exists. Comparing them would fail the CLI for
+   * being *more* capable than the host it is compared against, which is the opposite of what
+   * a conformance suite should reward.
+   *
+   * Set `"include"` to assert that a capable producer does report them; see the CLI's own
+   * conformance test.
+   */
+  typeOnlyEdges?: "include" | "exclude";
 }
 
 /**
@@ -143,6 +156,7 @@ export function graphSnapshot(
 ): GraphSnapshot {
   const coarse = (opts.edgeKinds ?? "coarse") === "coarse";
   const kindOf = (kind: string): string => (coarse && kind === "reexport" ? "static" : kind);
+  const keepTypeOnly = (opts.typeOnlyEdges ?? "exclude") === "include";
 
   // Virtual modules are EXCLUDED, along with every edge touching one.
   //
@@ -164,7 +178,11 @@ export function graphSnapshot(
     edges: graph
       .edges()
       .filter((e) => !virtual.has(e.from) && !virtual.has(e.to))
-      .map((e) => `${e.from} -> ${e.to} (${kindOf(e.kind)})`)
+      .filter((e) => keepTypeOnly || e.attributes?.typeOnly !== true)
+      .map(
+        (e) =>
+          `${e.from} -> ${e.to} (${kindOf(e.kind)}${e.attributes?.typeOnly === true ? ", type-only" : ""})`,
+      )
       .sort(),
   };
 }

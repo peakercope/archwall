@@ -33,6 +33,36 @@ interface RuleRun {
 }
 
 /**
+ * Per-call knobs, kept OUT of {@link ResolvedConfig}.
+ *
+ * The distinction is load-bearing: `ResolvedConfig` is the user's declared policy, is
+ * serialisable, and is the same for every run. These are properties of one invocation. Folding
+ * a cancellation token into the config would make the config unserialisable and would mean two
+ * runs of "the same configuration" were not comparable.
+ *
+ * The parameter exists now, ahead of most of its contents, on purpose: adding a third parameter
+ * later is free, but adding it *after* third parties have wrapped `analyze` is not, and every
+ * capability that wants a per-call channel (progress, logging, cancellation, incremental reuse)
+ * would otherwise arrive as its own breaking change.
+ */
+export interface AnalyzeOptions {
+  /**
+   * Aborts the run between rules. Honoured at rule-dispatch boundaries, not mid-traversal:
+   * a rule sees the whole slice it was given or none of it, so a cancelled run never produces
+   * the partial findings {@link RuleRun.crashed} exists to discard.
+   */
+  signal?: AbortSignal;
+  /**
+   * RESERVED, and currently ignored. The previous run's result, for incremental reuse.
+   *
+   * Declared before it is honoured so that the eventual implementation is a behaviour change
+   * rather than a signature change. Passing it today is safe and does nothing; do not write
+   * code that depends on it having an effect.
+   */
+  previous?: AnalysisResult;
+}
+
+/**
  * The engine: prepare the graph (boundary → transforms → classify), then check it.
  *
  * Pure — no I/O, no reporter calls; reporters are driven by the run edge (integration-kit).
@@ -40,8 +70,10 @@ interface RuleRun {
 export async function analyze(
   graph: ProjectGraph,
   config: ResolvedConfig,
+  options: AnalyzeOptions = {},
 ): Promise<AnalysisResult> {
   const started = performance.now();
+  options.signal?.throwIfAborted();
   assertIrCompatible(graph.irVersion);
 
   const diagnostics: Diagnostic[] = [...config.diagnostics];
@@ -230,12 +262,13 @@ export async function analyze(
   }
 
   const active = runs.filter((r) => !r.halted);
-  dispatchVisitors(active, diagnostics, scopeKeyOf);
+  dispatchVisitors(active, diagnostics, scopeKeyOf, options.signal);
 
   // Whole-graph rules run after the traversal, and one at a time: they may be async, and
   // several of them share the memoized computation cache.
   for (const run of active) {
     if (run.halted || run.resolved.rule.check === undefined) continue;
+    options.signal?.throwIfAborted();
     const startedRule = performance.now();
     try {
       await run.resolved.rule.check(run.ctx);
@@ -271,6 +304,11 @@ export async function analyze(
     // Deterministic order: baselines, CI diffing, and snapshot tests all need two runs of
     // the same analysis to be byte-identical.
     violations: kept.sort(compareViolations),
+    // Always empty HERE, and that is the design, not a stub. Suppression is policy — it reads
+    // a file, it can be stale, and it decides pass/fail — so it belongs at the run edge beside
+    // `failOn`, not inside the pure engine. The field lives on the result because that is what
+    // reporters consume; it is populated by the layer that owns the policy.
+    suppressed: [],
     diagnostics,
     rules: runs.map((r) => r.info),
     repoRoot: config.repoRoot,
@@ -300,6 +338,7 @@ function dispatchVisitors(
   runs: readonly RuleRun[],
   diagnostics: Diagnostic[],
   scopeKeyOf: (scope: RuleScope | undefined) => string,
+  signal?: AbortSignal,
 ): void {
   interface Bucket<T> {
     /** Evaluated once, then shared by every member. */
@@ -361,6 +400,10 @@ function dispatchVisitors(
       const items = bucket.slice();
       for (const { run, visit } of bucket.members) {
         if (run.halted) continue;
+        // Between rules, never between visits: an aborted rule would leave exactly the
+        // partial findings the crash path exists to discard, and paying a check per edge
+        // would cost more than the traversal it guards.
+        signal?.throwIfAborted();
         const startedRule = performance.now();
         try {
           for (const item of items) visit(item, run.ctx);

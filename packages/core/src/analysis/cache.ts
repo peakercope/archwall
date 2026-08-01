@@ -1,5 +1,5 @@
 import type { GraphComputation } from "../contracts/analysis.js";
-import type { GraphQuery } from "../graph/query.js";
+import type { GraphView } from "../graph/query.js";
 
 /**
  * Memoizes graph computations per (computation, view): ten unscoped rules requesting SCCs cost
@@ -14,9 +14,9 @@ import type { GraphQuery } from "../graph/query.js";
  * (no scope at all) is still one evaluation for everyone.
  */
 export class GraphComputationCache {
-  readonly #memo = new Map<GraphQuery, Map<GraphComputation<unknown>, unknown>>();
+  readonly #memo = new Map<GraphView, Map<GraphComputation<unknown>, unknown>>();
 
-  get<T>(computation: GraphComputation<T>, graph: GraphQuery): T {
+  get<T>(computation: GraphComputation<T>, graph: GraphView): T {
     let perView = this.#memo.get(graph);
     if (perView === undefined) {
       perView = new Map();

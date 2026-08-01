@@ -80,8 +80,26 @@ export interface RuleRunInfo {
 }
 
 export interface AnalysisResult {
-  /** Deterministically ordered; see `compareViolations`. */
+  /**
+   * Findings that COUNT — the ones `failOn` gates and reporters lead with. Deterministically
+   * ordered; see `compareViolations`.
+   */
   violations: readonly Violation[];
+  /**
+   * Findings matched by the baseline and therefore not counted, in the same order.
+   *
+   * Separate from `violations` rather than a flag on them, because every consumer that exists
+   * wants the un-suppressed set by default: a reporter that had to remember to filter would
+   * eventually forget, and the failure would be an enforcement tool quietly counting findings
+   * the user already accepted.
+   *
+   * Always present, empty when no baseline is configured — so a reporter written today needs
+   * no change when baselines arrive, and `violations.length + suppressed.length` is the total
+   * the analysis actually found.
+   *
+   * @see UserConfig.baseline
+   */
+  suppressed: readonly Violation[];
   /** Everything that is not a violation: skipped rules, crashed rules, config problems. */
   diagnostics: readonly Diagnostic[];
   stats: AnalysisStats;

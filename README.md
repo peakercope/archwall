@@ -181,7 +181,7 @@ esbuild has no module-graph hook, so its adapter validates at `onEnd` from the b
 | [`@archwall/rspack`](packages/rspack) | Rspack-shaped surface over `@archwall/bundler-plugin` |
 | [`@archwall/webpack`](packages/webpack) | webpack-shaped surface over `@archwall/bundler-plugin` |
 | [`@archwall/cli`](packages/cli) | Standalone CLI (own resolver: oxc-resolver + es-module-lexer) |
-| [`@archwall/test-utils`](packages/test-utils) | Fixture graphs + assertions for the suites in this repo — internal, not published |
+| [`@archwall/test-utils`](packages/test-utils) | Fixture graphs + assertions for testing rules, presets, and classifiers |
 | [`archwall`](packages/archwall) | Umbrella: `defineConfig`, the three presets, **all eight rules**, `defineRule`, … |
 
 ## Writing a rule
@@ -296,9 +296,10 @@ which specifier a finding was about.
 
 ## Known limitations (v1)
 
-- **Type-only imports are invisible.** `import type` is erased before any bundler graph exists, so type-level violations pass; the CLI deliberately skips type-only statements for parity. Complement with ESLint-side rules if you need type-edge enforcement. A future TS-aware enricher is planned as an additive capability, not an IR redesign.
+- **Type-only imports are visible only under the CLI.** `import type` is erased before any bundler graph exists, so no bundler adapter can report it. The CLI lexes source, so it does report those edges — labelled `attributes.typeOnly` and gated by the `type-only-edges` capability, so a rule about them skips loudly under a host that cannot supply them rather than silently matching nothing. Whether an erased import counts as a dependency is yours to decide: layering rules usually want to see them, `no-cycles` usually does not, so apply `dropTypeOnlyEdges()` where you want them gone. Per-specifier `import { type A }` is not detected — that needs a parser, not a lexer, and such an edge is reported as an ordinary value edge.
 - No auto-fixing, no runtime (browser) enforcement.
-- **No baseline file yet.** Adopting ArchWall on an existing codebase reports everything at once, and a graph-based linter has no source text in which to put an ignore comment. Violation fingerprints ship now so the baseline can land later without changing violation identity.
+- **No baseline file yet.** Adopting ArchWall on an existing codebase reports everything at once, and a graph-based linter has no source text in which to put an ignore comment. Violation fingerprints ship now so the baseline can land later without changing violation identity, and the shapes it will use are already reserved: `AnalysisResult.suppressed`, `UserConfig.baseline`, and the `baseline-stale` diagnostic gate all exist and are inert, so no frozen type has to change when suppression lands.
+- **The CLI reads JavaScript and TypeScript only.** `.vue`, `.svelte`, and `.astro` files inside the project boundary cannot be lexed, so they are absent from the graph — but no longer silently: the run reports an `unscannable-files` diagnostic naming the count, extensions, and example paths. Turn on `failOnDiagnostics.unscannableFiles` to make it fail, or run ArchWall through your bundler, whose compiler already knows how to read them.
 - The full inventory of what static dependency analysis can and cannot prove — including why Nx-style project tags and DDD aggregate boundaries are out of scope — is in [`docs/presets/limitations.md`](docs/presets/limitations.md).
 - **`no-deep-imports` does not run under Vite.** Vite 8 expands aliases before any plugin observes an import, so the adapter cannot see what the author wrote and does not claim `raw-specifiers`; the rule is skipped with a diagnostic rather than silently matching nothing. Use the CLI, Rspack/webpack, or a Rollup build with the plugin ordered first — or `public-api`, which enforces the same intent from the graph side.
 - **No incremental validation.** Every run analyses the whole graph. The rule model now declares what each rule looks at, which is the prerequisite for invalidating only the rules a changed edge can affect — but the caching itself is not built.

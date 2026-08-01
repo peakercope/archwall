@@ -169,6 +169,58 @@ describe("IR conformance across producers", () => {
     }
   }, 360_000);
 
+  /**
+   * The type-only axis, both halves.
+   *
+   * A producer that reads source sees `import type`; every bundler erases it before a plugin
+   * hook exists. That is a legitimate capability difference, so the default comparison excludes
+   * these edges — but "excluded from comparison" must not decay into "never checked", which is
+   * how the CLI came to silently DROP them in the first place.
+   */
+  it("reports a type-only edge on a capable producer, labelled and not dropped", async () => {
+    const cli: { snapshot?: GraphSnapshot } = {};
+    await check({
+      cwd: FIXTURE,
+      config: {
+        sourceRoot: "src",
+        rules: [snapshotProbe(cli)],
+        failOn: "never",
+        reporters: [],
+      },
+    });
+    // Excluded by default — this is what keeps the CLI conformant against bundlers.
+    expect(cli.snapshot?.edges).not.toContain(
+      "file:src/feature/index.ts -> file:src/shared/util.ts (static, type-only)",
+    );
+
+    const labelled: { snapshot?: GraphSnapshot } = {};
+    await check({
+      cwd: FIXTURE,
+      config: {
+        sourceRoot: "src",
+        rules: [
+          configureRule(
+            defineRule<Record<string, never>>({
+              meta: {
+                name: "snapshot",
+                description: "Captures the graph.",
+                defaultSeverity: "warn",
+              },
+              check(ctx) {
+                labelled.snapshot = graphSnapshot(ctx.graph, { typeOnlyEdges: "include" });
+              },
+            }),
+          ),
+        ],
+        failOn: "never",
+        reporters: [],
+      },
+    });
+    expect(labelled.snapshot?.edges).toContain(
+      "file:src/feature/index.ts -> file:src/shared/util.ts (static, type-only)",
+    );
+  }, 120_000);
+
   it("distinguishes a re-export where the host declares `reexport-edges`", async () => {
     // The coarse comparison above must not hide the fact that capable hosts DO report it.
     const cli: { snapshot?: GraphSnapshot } = {};

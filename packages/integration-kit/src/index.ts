@@ -81,6 +81,6 @@ export type {
 export { createModuleKindResolver } from "./module-kind.js";
 export { packageNameFromPath } from "./module-path.js";
 export { nodeIO } from "./node-io.js";
-export type { ArchWallRun, CreateRunOptions, RunResult } from "./run.js";
+export type { ArchWallRun, CreateRunOptions, RunCheckOptions, RunResult } from "./run.js";
 export { createArchWallRun, summarize } from "./run.js";
 export { barePackageName, isBuiltinSpecifier } from "./specifiers.js";

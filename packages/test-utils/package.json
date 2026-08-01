@@ -1,8 +1,13 @@
 {
   "name": "@archwall/test-utils",
   "version": "0.1.0",
-  "private": true,
   "description": "Fixture graph builders and violation assertions for testing ArchWall rules, presets, and classifiers.",
+  "keywords": [
+    "archwall",
+    "testing",
+    "architecture",
+    "dependency-graph"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,6 +33,7 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
+    "access": "public",
     "exports": {
       ".": {
         "import": "./dist/index.mjs",

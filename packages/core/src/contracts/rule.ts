@@ -1,5 +1,5 @@
 import type { Capability, Edge, ModuleId, ModuleNode } from "../graph/ir.js";
-import type { EdgeFilter, GraphQuery, ModuleFilter } from "../graph/query.js";
+import type { EdgeFilter, GraphView, ModuleFilter } from "../graph/query.js";
 import type { Severity, ViolationInput } from "../violations.js";
 import type { GraphComputation } from "./analysis.js";
 import type { StandardSchemaV1 } from "./standard-schema.js";
@@ -44,7 +44,7 @@ export interface RuleMeta<Options> {
 
 export interface RuleContext<Options> {
   options: Options;
-  graph: GraphQuery;
+  graph: GraphView;
   /**
    * Absolute source root. The base for any path *pattern* a rule matches against, so that
    * rule options read the same way as classifier patterns and `include`/`exclude`.

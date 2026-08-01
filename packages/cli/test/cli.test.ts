@@ -18,7 +18,7 @@ describe("offsetToLineCol", () => {
 describe("buildGraphFromFilesystem", () => {
   it("resolves tsconfig path aliases and records raw specifiers, locs, reexports", async () => {
     const config = resolveConfig({ sourceRoot: "src" }, { cwd: fixtureDir });
-    const g = await buildGraphFromFilesystem(config, cliHost());
+    const { graph: g } = await buildGraphFromFilesystem(config, cliHost());
     // Canonical ids, repo-root relative — `srcRoot` is only still needed for `loc.file`, which is a real filesystem path.
     const deep = g
       .edges()

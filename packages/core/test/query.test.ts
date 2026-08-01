@@ -1,5 +1,6 @@
 import type { Edge, ModuleKind, ModuleNode } from "@archwall/core";
-import { GraphQuery, ProjectGraph, THIRD_PARTY_KINDS } from "@archwall/core";
+import { ProjectGraph, THIRD_PARTY_KINDS } from "@archwall/core";
+import { GraphQuery } from "@archwall/core/internal";
 import { describe, expect, it } from "vitest";
 
 function mod(

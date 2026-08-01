@@ -1,4 +1,4 @@
-import type { GraphQuery } from "../graph/query.js";
+import type { GraphView } from "../graph/query.js";
 
 /**
  * A memoized derived value over the graph — an SCC decomposition, a reachability table —
@@ -12,7 +12,7 @@ import type { GraphQuery } from "../graph/query.js";
  */
 export interface GraphComputation<T> {
   name: string;
-  compute(graph: GraphQuery): T;
+  compute(graph: GraphView): T;
 }
 
 export function defineGraphComputation<T>(computation: GraphComputation<T>): GraphComputation<T> {

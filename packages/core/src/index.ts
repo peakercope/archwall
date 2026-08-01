@@ -44,6 +44,7 @@ export type {
   DiagnosticSeverity,
   EmptyScopeDetails,
   RuleSkippedDetails,
+  UnscannableFilesDetails,
   WellKnownDiagnosticCode,
 } from "./contracts/diagnostic.js";
 export type { Preset, PresetMeta } from "./contracts/preset.js";
@@ -81,11 +82,13 @@ export type {
   TransformContext,
 } from "./contracts/transform.js";
 export { defineTransform } from "./contracts/transform.js";
+export type { AnalyzeOptions } from "./engine/analyze.js";
 export { analyze } from "./engine/analyze.js";
 export { ArchWallError, IrVersionMismatchError } from "./errors.js";
 export type {
   Capability,
   Edge,
+  EdgeAttributes,
   EdgeKind,
   GraphDelivery,
   GraphMutation,
@@ -112,8 +115,12 @@ export {
   parseModuleId,
   THIRD_PARTY_KINDS,
 } from "./graph/ir.js";
-export type { EdgeFilter, ModuleFilter, ModuleSelection } from "./graph/query.js";
-export { GraphQuery } from "./graph/query.js";
+export type {
+  EdgeFilter,
+  GraphView,
+  ModuleFilter,
+  ModuleSelection,
+} from "./graph/query.js";
 export { matchCaptures, matchesPattern } from "./match.js";
 export {
   consoleReporter,
@@ -129,6 +136,7 @@ export {
 } from "./reporters/resolve.js";
 export { sarifReporter } from "./reporters/sarif.js";
 export { dropSelfEdges } from "./transforms/drop-self-edges.js";
+export { dropTypeOnlyEdges } from "./transforms/drop-type-only-edges.js";
 export type {
   Severity,
   SeverityCounts,

@@ -3,10 +3,10 @@ import {
   configureRule,
   defineGraphComputation,
   defineRule,
-  GraphQuery,
   primaryModule,
   resolveConfig,
 } from "@archwall/core";
+import { GraphQuery } from "@archwall/core/internal";
 import { buildFixtureGraph } from "@archwall/test-utils";
 import { describe, expect, it } from "vitest";
 

@@ -1,11 +1,6 @@
 import type { Edge, ModuleKind, ModuleNode } from "@archwall/core";
-import {
-  defineGraphComputation,
-  GraphQuery,
-  ProjectGraph,
-  stronglyConnectedComponents,
-} from "@archwall/core";
-import { GraphComputationCache } from "@archwall/core/internal";
+import { defineGraphComputation, ProjectGraph, stronglyConnectedComponents } from "@archwall/core";
+import { GraphComputationCache, GraphQuery } from "@archwall/core/internal";
 import { describe, expect, it } from "vitest";
 
 function mod(

@@ -1,5 +1,6 @@
 import type {
   Edge,
+  EdgeAttributes,
   EdgeKind,
   GraphDelivery,
   HostInfo,
@@ -67,6 +68,12 @@ export interface AddEdgeInput {
   /** Default "static". */
   kind?: EdgeKind;
   loc?: SourceLocation;
+  /**
+   * Orthogonal facts; see `EdgeAttributes`. Only report what the host actually knows —
+   * an absent attribute means "not said", so inventing `typeOnly: true` on a guess is worse
+   * than omitting it. Declare the matching capability when you do report one.
+   */
+  attributes?: EdgeAttributes;
 }
 
 interface PendingEdge {
@@ -76,9 +83,59 @@ interface PendingEdge {
   resolvedPath: string | undefined;
   kind: EdgeKind;
   loc?: SourceLocation;
+  attributes?: EdgeAttributes;
 }
 
 export { barePackageName, isBuiltinSpecifier } from "./specifiers.js";
+
+/**
+ * Merges the attributes of two edges that dedupe onto one, keeping only what BOTH assert.
+ *
+ * Intersection, not union, and the asymmetry is the whole point. A module that writes both
+ *
+ * ```ts
+ * import type { A } from "./x";
+ * import { b } from "./x";
+ * ```
+ *
+ * has one dependency on `./x`, and it is emphatically *not* type-only — erasing the type
+ * import leaves the value import behind. Union would mark the merged edge `typeOnly` and a
+ * "type-only imports may cross this boundary" rule would then wave through a real violation.
+ *
+ * Because absent means "not asserted" (never `false`), intersection is also what makes the
+ * merge safe for attributes core does not know about: an attribute only survives if every
+ * contributing edge agreed on it.
+ */
+function intersectAttributes(
+  a: EdgeAttributes | undefined,
+  b: EdgeAttributes | undefined,
+): EdgeAttributes | undefined {
+  if (a === undefined || b === undefined) return undefined;
+  const merged: EdgeAttributes = {};
+  let any = false;
+  for (const [key, value] of Object.entries(a)) {
+    if (value === undefined || b[key] !== value) continue;
+    merged[key] = value;
+    any = true;
+  }
+  return any ? merged : undefined;
+}
+
+/**
+ * Applies {@link intersectAttributes} in place, DELETING the key when nothing survives.
+ *
+ * Assigning `undefined` would leave the property present, which `exactOptionalPropertyTypes`
+ * rejects and which would also make `"attributes" in edge` true for an edge carrying none —
+ * a distinction the absent/false contract depends on.
+ */
+function mergeAttributesInto(
+  target: { attributes?: EdgeAttributes },
+  add: EdgeAttributes | undefined,
+): void {
+  const merged = intersectAttributes(target.attributes, add);
+  if (merged === undefined) delete target.attributes;
+  else target.attributes = merged;
+}
 
 /**
  * Collects host facts, then hands back a graph in the IR's own terms.
@@ -95,7 +152,8 @@ export class GraphBuilder {
   readonly #irVersion: string;
   readonly #modules = new Map<string, AddModuleInput>();
   readonly #edges: PendingEdge[] = [];
-  readonly #edgeKeys = new Set<string>();
+  /** Dedup key → the pending edge, so a repeat can MERGE rather than be dropped. */
+  readonly #edgeIndex = new Map<string, PendingEdge>();
 
   constructor(opts: GraphBuilderOptions) {
     this.#host = opts.host;
@@ -121,16 +179,22 @@ export class GraphBuilder {
 
   addEdge(e: AddEdgeInput): this {
     const key = `${e.from} ${e.to} ${e.rawSpecifier ?? ""} ${e.kind ?? "static"}`;
-    if (this.#edgeKeys.has(key)) return this;
-    this.#edgeKeys.add(key);
-    this.#edges.push({
+    const existing = this.#edgeIndex.get(key);
+    if (existing !== undefined) {
+      mergeAttributesInto(existing, e.attributes);
+      return this;
+    }
+    const pending: PendingEdge = {
       from: e.from,
       to: e.to,
       rawSpecifier: e.rawSpecifier,
       resolvedPath: e.resolvedPath,
       kind: e.kind ?? "static",
       ...(e.loc !== undefined ? { loc: e.loc } : {}),
-    });
+      ...(e.attributes !== undefined ? { attributes: e.attributes } : {}),
+    };
+    this.#edgeIndex.set(key, pending);
+    this.#edges.push(pending);
     return this;
   }
 
@@ -205,7 +269,7 @@ export class GraphBuilder {
 
     // --- edges, rewritten and re-deduplicated --------------------------------------------
     const edges: Edge[] = [];
-    const seen = new Set<string>();
+    const seen = new Map<string, Edge>();
     for (const e of this.#edges) {
       // Both endpoints were registered in `inputs` above, so both are in the map.
       const from = canonical.get(e.from);
@@ -223,10 +287,18 @@ export class GraphBuilder {
           e.resolvedPath === undefined ? to : (canonical.get(e.resolvedPath) ?? e.resolvedPath),
         kind: e.kind,
         ...(e.loc !== undefined ? { loc: e.loc } : {}),
+        ...(e.attributes !== undefined ? { attributes: e.attributes } : {}),
       };
       const key = `${edge.from} ${edge.to} ${edge.rawSpecifier} ${edge.kind}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const prior = seen.get(key);
+      if (prior !== undefined) {
+        // Canonicalisation collapses distinct host ids onto one id, so edges that were
+        // separate above can meet here — every file of a package becoming `pkg:x`, for
+        // instance. Same merge policy as `addEdge`, for the same reason.
+        mergeAttributesInto(prior, edge.attributes);
+        continue;
+      }
+      seen.set(key, edge);
       edges.push(edge);
     }
 

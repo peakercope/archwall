@@ -17,8 +17,6 @@ export type Severity = "error" | "warn" | "info";
  * offending location — it has N of them, and the old model could only name one and had to
  * serialise the rest into the message string. A finding about a package, a directory, or
  * the configuration has no module at all.
- *
- * See docs/adr/0004-violation-locations.md.
  */
 export type ViolationLocation =
   | { type: "edge"; edge: Edge }
@@ -140,8 +138,7 @@ export function renderMessage(
  * Fingerprint scheme version. Bump when the algorithm changes so that a stale baseline
  * ERRORS instead of silently mismatching every entry.
  *
- * `aw3` is the first scheme over canonical module ids
- * (docs/adr/0012-canonical-module-identity.md). Before it, a violation about `react` hashed the
+ * `aw3` is the first scheme over canonical module ids. Before it, a violation about `react` hashed the
  * host's own id — a resolved `node_modules` path under the CLI, the bare specifier under esbuild
  * — so the same finding fingerprinted differently under two bundlers.
  */

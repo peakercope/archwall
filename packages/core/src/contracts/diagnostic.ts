@@ -26,7 +26,24 @@ export type WellKnownDiagnosticCode =
   /** A configured rule, or one of its options, is deprecated. */
   | "rule-deprecated"
   /** A graph transform threw. The pipeline continued without its contribution. */
-  | "transform-failed";
+  | "transform-failed"
+  /**
+   * Files are inside the project boundary that the producer cannot read, so they are absent
+   * from the graph entirely — not excluded, not unresolved, just invisible.
+   *
+   * Only a producer that ENUMERATES a directory tree can detect this, which in practice means
+   * the CLI: a bundler adapter is handed a graph whose membership its compiler already decided.
+   */
+  | "unscannable-files"
+  /**
+   * The baseline lists violations this run did not produce — they were fixed, or the code
+   * they were about is gone.
+   *
+   * Worth saying out loud rather than tolerating: a baseline that is never pruned stops being
+   * "debt we accepted" and becomes a permanent hole, and the stale entry will silently
+   * re-suppress the finding if it ever comes back.
+   */
+  | "baseline-stale";
 
 export type DiagnosticCode = WellKnownDiagnosticCode | (string & {});
 
@@ -51,6 +68,16 @@ export interface Diagnostic {
 export interface RuleSkippedDetails {
   missingCapabilities: readonly Capability[];
   host: string;
+}
+
+/** Payload shape for `code: "unscannable-files"`. */
+export interface UnscannableFilesDetails {
+  /** How many in-boundary files the producer could not read. */
+  count: number;
+  /** Distinct extensions, most common first — what to act on. */
+  extensions: readonly string[];
+  /** A bounded sample of repo-relative paths, for a message a human can follow. */
+  sample: readonly string[];
 }
 
 /** Payload shape for `code: "empty-scope"`. */
