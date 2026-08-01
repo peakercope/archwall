@@ -1,6 +1,6 @@
 {
   "name": "@archwall/rspack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Rspack and webpack adapter for ArchWall: validates the real module graph at finishModules.",
   "license": "MIT",
   "repository": {

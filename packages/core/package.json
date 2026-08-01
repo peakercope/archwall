@@ -1,6 +1,6 @@
 {
   "name": "@archwall/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Graph IR, analysis engine, and rule/preset/reporter contracts for ArchWall.",
   "license": "MIT",
   "repository": {

@@ -1,5 +1,11 @@
 # @archwall/rspack
 
+## 0.2.0
+
+### Patch Changes
+
+- @archwall/bundler-plugin@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
