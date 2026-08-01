@@ -1,5 +1,13 @@
 # @archwall/cli
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [b56068e]
+  - @archwall/integration-kit@1.0.0
+  - @archwall/core@1.0.0
+
 ## 0.2.1
 
 ### Patch Changes
