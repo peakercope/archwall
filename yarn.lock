@@ -12,12 +12,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@archwall/bundler-plugin@npm:^0.2.1, @archwall/bundler-plugin@workspace:packages/bundler-plugin":
+"@archwall/bundler-plugin@npm:^1.0.0, @archwall/bundler-plugin@workspace:packages/bundler-plugin":
   version: 0.0.0-use.local
   resolution: "@archwall/bundler-plugin@workspace:packages/bundler-plugin"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/integration-kit": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/integration-kit": "npm:^1.0.0"
   languageName: unknown
   linkType: soft
 
@@ -25,13 +25,13 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@archwall/cli@workspace:packages/cli"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/esbuild": "npm:^0.2.1"
-    "@archwall/integration-kit": "npm:^0.2.1"
-    "@archwall/presets": "npm:^0.2.1"
-    "@archwall/rollup": "npm:^0.2.1"
-    "@archwall/rspack": "npm:^0.2.1"
-    "@archwall/vite": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/esbuild": "npm:^1.0.0"
+    "@archwall/integration-kit": "npm:^1.0.0"
+    "@archwall/presets": "npm:^1.0.0"
+    "@archwall/rollup": "npm:^1.0.0"
+    "@archwall/rspack": "npm:^1.0.0"
+    "@archwall/vite": "npm:^1.0.0"
     "@rollup/plugin-node-resolve": "npm:^16.0.3"
     "@rollup/plugin-typescript": "npm:^12.3.0"
     "@rspack/core": "npm:^2.1.6"
@@ -53,7 +53,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@archwall/core@npm:^0.2.1, @archwall/core@workspace:^, @archwall/core@workspace:packages/core":
+"@archwall/core@npm:^1.0.0, @archwall/core@workspace:^, @archwall/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@archwall/core@workspace:packages/core"
   dependencies:
@@ -62,14 +62,14 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@archwall/esbuild@npm:^0.2.1, @archwall/esbuild@workspace:packages/esbuild":
+"@archwall/esbuild@npm:^1.0.0, @archwall/esbuild@workspace:packages/esbuild":
   version: 0.0.0-use.local
   resolution: "@archwall/esbuild@workspace:packages/esbuild"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/integration-kit": "npm:^0.2.1"
-    "@archwall/presets": "npm:^0.2.1"
-    "@archwall/rules": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/integration-kit": "npm:^1.0.0"
+    "@archwall/presets": "npm:^1.0.0"
+    "@archwall/rules": "npm:^1.0.0"
     esbuild: "npm:^0.28.1"
     typescript: "npm:^6.0.3"
   peerDependencies:
@@ -80,40 +80,40 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@archwall/integration-kit@npm:^0.2.1, @archwall/integration-kit@workspace:packages/integration-kit":
+"@archwall/integration-kit@npm:^1.0.0, @archwall/integration-kit@workspace:packages/integration-kit":
   version: 0.0.0-use.local
   resolution: "@archwall/integration-kit@workspace:packages/integration-kit"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/presets": "npm:^0.2.1"
-    "@archwall/test-utils": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/presets": "npm:^1.0.0"
+    "@archwall/test-utils": "npm:^1.0.0"
     jiti: "npm:^2.7.0"
     react: "npm:^19.2.8"
   peerDependencies:
-    "@archwall/core": ^0.2.1
+    "@archwall/core": ^1.0.0
   languageName: unknown
   linkType: soft
 
-"@archwall/presets@npm:^0.2.1, @archwall/presets@workspace:packages/presets":
+"@archwall/presets@npm:^1.0.0, @archwall/presets@workspace:packages/presets":
   version: 0.0.0-use.local
   resolution: "@archwall/presets@workspace:packages/presets"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/rules": "npm:^0.2.1"
-    "@archwall/test-utils": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/rules": "npm:^1.0.0"
+    "@archwall/test-utils": "npm:^1.0.0"
   peerDependencies:
-    "@archwall/core": ^0.2.1
+    "@archwall/core": ^1.0.0
   languageName: unknown
   linkType: soft
 
-"@archwall/rollup@npm:^0.2.1, @archwall/rollup@workspace:packages/rollup":
+"@archwall/rollup@npm:^1.0.0, @archwall/rollup@workspace:packages/rollup":
   version: 0.0.0-use.local
   resolution: "@archwall/rollup@workspace:packages/rollup"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/integration-kit": "npm:^0.2.1"
-    "@archwall/presets": "npm:^0.2.1"
-    "@archwall/rules": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/integration-kit": "npm:^1.0.0"
+    "@archwall/presets": "npm:^1.0.0"
+    "@archwall/rules": "npm:^1.0.0"
     "@rollup/plugin-node-resolve": "npm:^16.0.3"
     "@rollup/plugin-typescript": "npm:^12.3.0"
     rollup: "npm:^4.62.4"
@@ -127,13 +127,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@archwall/rspack@npm:^0.2.1, @archwall/rspack@workspace:packages/rspack":
+"@archwall/rspack@npm:^1.0.0, @archwall/rspack@workspace:packages/rspack":
   version: 0.0.0-use.local
   resolution: "@archwall/rspack@workspace:packages/rspack"
   dependencies:
-    "@archwall/bundler-plugin": "npm:^0.2.1"
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/presets": "npm:^0.2.1"
+    "@archwall/bundler-plugin": "npm:^1.0.0"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/presets": "npm:^1.0.0"
     "@rspack/core": "npm:^2.1.6"
     "@swc/core": "npm:^1.15.46"
     swc-loader: "npm:^0.2.7"
@@ -149,35 +149,35 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@archwall/rules@npm:^0.2.1, @archwall/rules@workspace:^, @archwall/rules@workspace:packages/rules":
+"@archwall/rules@npm:^1.0.0, @archwall/rules@workspace:^, @archwall/rules@workspace:packages/rules":
   version: 0.0.0-use.local
   resolution: "@archwall/rules@workspace:packages/rules"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/test-utils": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/test-utils": "npm:^1.0.0"
   peerDependencies:
-    "@archwall/core": ^0.2.1
+    "@archwall/core": ^1.0.0
   languageName: unknown
   linkType: soft
 
-"@archwall/test-utils@npm:^0.2.1, @archwall/test-utils@workspace:packages/test-utils":
+"@archwall/test-utils@npm:^1.0.0, @archwall/test-utils@workspace:packages/test-utils":
   version: 0.0.0-use.local
   resolution: "@archwall/test-utils@workspace:packages/test-utils"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
   peerDependencies:
-    "@archwall/core": ^0.2.1
+    "@archwall/core": ^1.0.0
   languageName: unknown
   linkType: soft
 
-"@archwall/vite@npm:^0.2.1, @archwall/vite@workspace:^, @archwall/vite@workspace:packages/vite":
+"@archwall/vite@npm:^1.0.0, @archwall/vite@workspace:^, @archwall/vite@workspace:packages/vite":
   version: 0.0.0-use.local
   resolution: "@archwall/vite@workspace:packages/vite"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/integration-kit": "npm:^0.2.1"
-    "@archwall/presets": "npm:^0.2.1"
-    "@archwall/rollup": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/integration-kit": "npm:^1.0.0"
+    "@archwall/presets": "npm:^1.0.0"
+    "@archwall/rollup": "npm:^1.0.0"
     vite: "npm:^8.1.5"
   peerDependencies:
     vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0
@@ -188,7 +188,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@archwall/webpack@workspace:packages/webpack"
   dependencies:
-    "@archwall/bundler-plugin": "npm:^0.2.1"
+    "@archwall/bundler-plugin": "npm:^1.0.0"
   peerDependencies:
     webpack: ^5.0.0
   languageName: unknown
@@ -2461,9 +2461,9 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "archwall@workspace:packages/archwall"
   dependencies:
-    "@archwall/core": "npm:^0.2.1"
-    "@archwall/presets": "npm:^0.2.1"
-    "@archwall/rules": "npm:^0.2.1"
+    "@archwall/core": "npm:^1.0.0"
+    "@archwall/presets": "npm:^1.0.0"
+    "@archwall/rules": "npm:^1.0.0"
   languageName: unknown
   linkType: soft
 

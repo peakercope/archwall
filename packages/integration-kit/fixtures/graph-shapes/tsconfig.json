@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+    "types": ["node"],
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "paths": { "@/*": ["./src/*"] }
