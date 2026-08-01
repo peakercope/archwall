@@ -20,7 +20,7 @@
     "verify:pack": "node scripts/verify-pack.mjs",
     "typecheck": "yarn workspaces foreach -A --exclude archwall-monorepo exec tsc --noEmit",
     "version-packages": "changeset version",
-    "release": "yarn build && yarn verify:pack && changeset publish"
+    "release": "yarn build && yarn verify:pack && node scripts/publish.mjs && changeset tag"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",

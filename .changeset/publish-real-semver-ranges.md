@@ -1,0 +1,38 @@
+---
+"@archwall/bundler-plugin": patch
+"@archwall/integration-kit": patch
+"@archwall/test-utils": patch
+"@archwall/esbuild": patch
+"@archwall/presets": patch
+"@archwall/rollup": patch
+"@archwall/rspack": patch
+"@archwall/webpack": patch
+"@archwall/rules": patch
+"@archwall/core": patch
+"@archwall/cli": patch
+"@archwall/vite": patch
+"archwall": patch
+---
+
+Fix unusable published packages. `0.1.0` and `0.2.0` should not be installed.
+
+Both earlier releases went to npm with manifests that were never rewritten for publishing:
+
+- `exports` still pointed at `./src/*.ts`, which no tarball contains — `files` is `["dist"]`. Any
+  import of any package threw `ERR_MODULE_NOT_FOUND`.
+- Internal dependencies were published as `"@archwall/core": "workspace:^"`, so installing anything
+  with an internal dependency failed with `EUNSUPPORTEDPROTOCOL`.
+
+Both fields come from Yarn features — `publishConfig.exports` and the `workspace:` protocol — that
+Yarn substitutes when it packs. Releases ran through `changeset publish`, which shells out to
+`npm publish`; npm treats `publishConfig` as npm config, warns `Unknown publishConfig config
+"exports"`, and drops it. The pack smoke test never caught it because it packs with Yarn, so it was
+checking a tarball no release ever uploaded.
+
+Releases now pack with Yarn and upload the finished tarball with `npm publish`, which keeps the
+correct manifest and keeps OIDC trusted publishing (Yarn's own publisher has no token exchange).
+`verify:pack` gained two guards: no `workspace:` range in a publishable manifest, and every
+advertised entrypoint must exist in the tarball — including for ESM-only packages, which the CJS
+load check skips.
+
+`@archwall/test-utils` is published for the first time in this release.

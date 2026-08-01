@@ -18,8 +18,8 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "workspace:^",
-    "@archwall/integration-kit": "workspace:^",
+    "@archwall/core": "^0.2.0",
+    "@archwall/integration-kit": "^0.2.0",
     "es-module-lexer": "^2.3.1",
     "oxc-resolver": "^11.24.2",
     "picomatch": "^4.0.5",
@@ -29,11 +29,11 @@
     "archwall": "./src/bin.ts"
   },
   "devDependencies": {
-    "@archwall/esbuild": "workspace:^",
-    "@archwall/presets": "workspace:^",
-    "@archwall/rollup": "workspace:^",
-    "@archwall/rspack": "workspace:^",
-    "@archwall/vite": "workspace:^",
+    "@archwall/esbuild": "^0.2.0",
+    "@archwall/presets": "^0.2.0",
+    "@archwall/rollup": "^0.2.0",
+    "@archwall/rspack": "^0.2.0",
+    "@archwall/vite": "^0.2.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "@rspack/core": "^2.1.6",

@@ -18,7 +18,7 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/bundler-plugin": "workspace:^"
+    "@archwall/bundler-plugin": "^0.2.0"
   },
   "peerDependencies": {
     "@rspack/core": "^2.0.0",
@@ -33,7 +33,7 @@
     }
   },
   "devDependencies": {
-    "@archwall/presets": "workspace:^",
+    "@archwall/presets": "^0.2.0",
     "@rspack/core": "^2.1.6",
     "@swc/core": "^1.15.46",
     "swc-loader": "^0.2.7",

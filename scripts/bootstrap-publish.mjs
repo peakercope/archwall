@@ -1,12 +1,17 @@
-// One-time, token-authenticated first publish of the 12 publishable packages.
-// (@archwall/test-utils is private: it versions with the group but never
-// reaches npm, and this script skips it the same way `changeset publish` does.)
+// Token-authenticated first publish of every package the registry does not
+// know yet. (Private packages version with the group but never reach npm, and
+// this script skips them the same way `changeset publish` does.)
 //
 // Why this exists: npm's trusted-publisher settings live on a package's own
 // Settings -> Publishing access page, so OIDC cannot be configured for a
 // package that does not exist yet. Release #1 has to be token-based; every
 // release after it runs unattended through .github/workflows/release.yml with
 // no long-lived credential anywhere.
+//
+// Not only release #1: a package that joins the group later - or one that
+// drops `"private": true`, as @archwall/test-utils did after 0.1.0 - carries
+// the same unclaimed name, and the release workflow will 404 on it until this
+// script claims it. Re-run then, for that package alone.
 //
 // Run it once, in this order:
 //
@@ -17,8 +22,8 @@
 //
 //        NPM_TOKEN=npm_xxx node scripts/bootstrap-publish.mjs
 //
-//   4. For each of the 12 published packages on npmjs.com: Settings ->
-//      Publishing access -> add a trusted publisher. Organization `peakercope`,
+//   4. For each package this run published for the first time, on npmjs.com:
+//      Settings -> Publishing access -> add a trusted publisher. Organization `peakercope`,
 //      repository `archwall`, workflow `release.yml`, allowed action
 //      `npm publish`. This is per-package and unavoidable.
 //   5. Revoke the token from step 3. Optionally set "Require two-factor

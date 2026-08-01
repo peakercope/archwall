@@ -18,9 +18,9 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "workspace:^",
-    "@archwall/presets": "workspace:^",
-    "@archwall/rules": "workspace:^"
+    "@archwall/core": "^0.2.0",
+    "@archwall/presets": "^0.2.0",
+    "@archwall/rules": "^0.2.0"
   },
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",

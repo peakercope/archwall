@@ -18,7 +18,7 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/bundler-plugin": "workspace:^"
+    "@archwall/bundler-plugin": "^0.2.0"
   },
   "peerDependencies": {
     "webpack": "^5.0.0"

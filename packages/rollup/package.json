@@ -17,7 +17,7 @@
     "node": ">=24"
   },
   "dependencies": {
-    "@archwall/integration-kit": "workspace:^"
+    "@archwall/integration-kit": "^0.2.0"
   },
   "peerDependencies": {
     "rollup": "^4.0.0"
@@ -39,8 +39,8 @@
     }
   },
   "devDependencies": {
-    "@archwall/presets": "workspace:^",
-    "@archwall/rules": "workspace:^",
+    "@archwall/presets": "^0.2.0",
+    "@archwall/rules": "^0.2.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "rollup": "^4.62.4",

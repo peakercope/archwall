@@ -20,7 +20,7 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "dependencies": {
-    "@archwall/integration-kit": "workspace:^"
+    "@archwall/integration-kit": "^0.2.0"
   },
   "peerDependencies": {
     "esbuild": "^0.25.0 || ^0.28.0"
@@ -45,9 +45,9 @@
     }
   },
   "devDependencies": {
-    "@archwall/core": "workspace:^",
-    "@archwall/presets": "workspace:^",
-    "@archwall/rules": "workspace:^",
+    "@archwall/core": "^0.2.0",
+    "@archwall/presets": "^0.2.0",
+    "@archwall/rules": "^0.2.0",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
   }
