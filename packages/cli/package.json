@@ -1,6 +1,6 @@
 {
   "name": "@archwall/cli",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "Standalone ArchWall CLI: builds the project graph with its own resolver and runs the same engine, no bundler required.",
   "license": "MIT",
   "repository": {
@@ -18,8 +18,8 @@
   },
   "main": "./dist/index.cjs",
   "dependencies": {
-    "@archwall/core": "^0.2.1",
-    "@archwall/integration-kit": "^0.2.1",
+    "@archwall/core": "^1.0.0",
+    "@archwall/integration-kit": "^1.0.0",
     "es-module-lexer": "^2.3.1",
     "oxc-resolver": "^11.24.2",
     "picomatch": "^4.0.5",
@@ -29,11 +29,11 @@
     "archwall": "./src/bin.ts"
   },
   "devDependencies": {
-    "@archwall/esbuild": "^0.2.1",
-    "@archwall/presets": "^0.2.1",
-    "@archwall/rollup": "^0.2.1",
-    "@archwall/rspack": "^0.2.1",
-    "@archwall/vite": "^0.2.1",
+    "@archwall/esbuild": "^1.0.0",
+    "@archwall/presets": "^1.0.0",
+    "@archwall/rollup": "^1.0.0",
+    "@archwall/rspack": "^1.0.0",
+    "@archwall/vite": "^1.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
     "@rspack/core": "^2.1.6",

@@ -1,6 +1,6 @@
 {
   "name": "@archwall/rules",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "Built-in ArchWall rules: layer dependencies, forbidden dependencies, public API, deep imports, isolation, cycles, friend modules.",
   "license": "MIT",
   "repository": {
@@ -18,11 +18,11 @@
   },
   "main": "./dist/index.cjs",
   "peerDependencies": {
-    "@archwall/core": "^0.2.1"
+    "@archwall/core": "^1.0.0"
   },
   "devDependencies": {
-    "@archwall/core": "^0.2.1",
-    "@archwall/test-utils": "^0.2.1"
+    "@archwall/core": "^1.0.0",
+    "@archwall/test-utils": "^1.0.0"
   },
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",

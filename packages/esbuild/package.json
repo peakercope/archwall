@@ -1,6 +1,6 @@
 {
   "name": "@archwall/esbuild",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "esbuild adapter for ArchWall: builds the project graph from the build's metafile.",
   "license": "MIT",
   "repository": {
@@ -20,8 +20,8 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "dependencies": {
-    "@archwall/core": "^0.2.1",
-    "@archwall/integration-kit": "^0.2.1"
+    "@archwall/core": "^1.0.0",
+    "@archwall/integration-kit": "^1.0.0"
   },
   "peerDependencies": {
     "esbuild": "^0.25.0 || ^0.28.0"
@@ -46,9 +46,9 @@
     }
   },
   "devDependencies": {
-    "@archwall/core": "^0.2.1",
-    "@archwall/presets": "^0.2.1",
-    "@archwall/rules": "^0.2.1",
+    "@archwall/core": "^1.0.0",
+    "@archwall/presets": "^1.0.0",
+    "@archwall/rules": "^1.0.0",
     "esbuild": "^0.28.1",
     "typescript": "^6.0.3"
   }
