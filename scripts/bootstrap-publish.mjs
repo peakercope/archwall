@@ -1,6 +1,6 @@
-// Token-authenticated first publish of every package the registry does not
+// Token-authenticated first publish of every package name the registry does not
 // know yet. (Private packages version with the group but never reach npm, and
-// this script skips them the same way `changeset publish` does.)
+// this script skips them the same way scripts/publish.mjs does.)
 //
 // Why this exists: npm's trusted-publisher settings live on a package's own
 // Settings -> Publishing access page, so OIDC cannot be configured for a
@@ -10,10 +10,18 @@
 //
 // Not only release #1: a package that joins the group later - or one that
 // drops `"private": true`, as @archwall/test-utils did after 0.1.0 - carries
-// the same unclaimed name, and the release workflow will 404 on it until this
-// script claims it. Re-run then, for that package alone.
+// the same unclaimed name, and the release workflow 404s on it until this
+// script claims it.
 //
-// Run it once, in this order:
+// It publishes *only* the unclaimed names, never the whole group, and that is
+// load-bearing rather than tidiness. Once a package has "require two-factor
+// authentication and disallow tokens" set (step 5 below), a token-authenticated
+// publish of it fails with E403. A run that swept every package would abort on
+// the first one already locked down correctly, without ever reaching the new
+// name. Names that already exist are not this script's problem: the release
+// workflow publishes them over OIDC.
+//
+// Run it in this order:
 //
 //   1. Create the `@archwall` org (or claim the scope) on npmjs.com.
 //   2. Merge the "chore: version packages" PR so every package sits at the
@@ -22,16 +30,18 @@
 //
 //        NPM_TOKEN=npm_xxx node scripts/bootstrap-publish.mjs
 //
-//   4. For each package this run published for the first time, on npmjs.com:
-//      Settings -> Publishing access -> add a trusted publisher. Organization `peakercope`,
+//   4. For each package this run published, on npmjs.com: Settings ->
+//      Publishing access -> add a trusted publisher. Organization `peakercope`,
 //      repository `archwall`, workflow `release.yml`, allowed action
 //      `npm publish`. This is per-package and unavoidable.
-//   5. Revoke the token from step 3. Optionally set "Require two-factor
-//      authentication and disallow tokens" per package to lock publishing to
-//      OIDC from here on.
+//   5. Revoke the token from step 3, and set "Require two-factor authentication
+//      and disallow tokens" on the package to lock publishing to OIDC.
+//   6. Re-run the release workflow. It publishes the rest of the group at this
+//      version over OIDC, including anything this run skipped.
 //
-// Safe to re-run: `changeset publish` skips any version already on the
-// registry, so a run that dies partway through resumes cleanly.
+// Safe to re-run: publish.mjs skips any version already on the registry, so a
+// run that dies partway through resumes cleanly, and a run with nothing left to
+// claim exits without touching anything.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -89,13 +99,39 @@ if (remaining.length > 0) {
   fail(`${remaining.length} unconsumed changeset(s). Run "yarn version-packages" first.`);
 }
 
-console.log(`Publishing ${versions.size} packages at ${version}:`);
-for (const name of versions.keys()) console.log(`  ${name}`);
+// --- Which names does the registry not know? --------------------------------
+// Anything other than a clean 404 is treated as unknown rather than assumed
+// missing: publishing on the back of a network blip would claim a name from a
+// half-answered question.
+const nameExists = (name) => {
+  try {
+    capture("npm", ["view", name, "name"]);
+    return true;
+  } catch (error) {
+    const stderr = error.stderr?.toString() ?? "";
+    if (stderr.includes("E404")) return false;
+    return fail(`could not ask the registry about ${name}:\n${stderr.trim()}`);
+  }
+};
+
+const unclaimed = [...versions.keys()].filter((name) => !nameExists(name));
+
+if (unclaimed.length === 0) {
+  console.log("Every package name is already on the registry - nothing to bootstrap.");
+  console.log("Releases run through .github/workflows/release.yml over OIDC.");
+  process.exit(0);
+}
+
+console.log(`Claiming ${unclaimed.length} unpublished name(s) at ${version}:`);
+for (const name of unclaimed) console.log(`  ${name}`);
+console.log(
+  `\nThe other ${versions.size - unclaimed.length} package(s) are left to the release workflow.`,
+);
 
 // --- Build, verify, publish -------------------------------------------------
-// `yarn release` is the same script CI runs, so the bootstrap and every later
-// release go through an identical build -> verify:pack -> publish path. The
-// only difference is where the credential comes from.
+// The same build -> verify:pack -> publish path `yarn release` runs, minus the
+// `changeset tag` at the end: tags belong to the release workflow, which pushes
+// them, not to a local bootstrap.
 //
 // The token goes in a temp userconfig rather than ~/.npmrc or the repo, so it
 // never outlives the process and cannot be committed by accident.
@@ -106,20 +142,27 @@ writeFileSync(npmrc, `//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}\
 });
 
 try {
-  execFileSync("yarn", ["release"], {
-    cwd: root,
-    stdio: "inherit",
-    env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrc },
-  });
+  for (const [cmd, args] of [
+    ["yarn", ["build"]],
+    ["yarn", ["verify:pack"]],
+    ["node", ["scripts/publish.mjs", `--only=${unclaimed.join(",")}`]],
+  ]) {
+    execFileSync(cmd, args, {
+      cwd: root,
+      stdio: "inherit",
+      env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrc },
+    });
+  }
 } finally {
   rmSync(npmrcDir, { recursive: true, force: true });
 }
 
 console.log(`
-Published ${version}. Now configure trusted publishing so no token is needed again:
+Claimed ${unclaimed.join(", ")} at ${version}. Now, on npmjs.com:
 
-  For each package on npmjs.com -> Settings -> Publishing access -> add a
-  trusted publisher (GitHub Actions, org "peakercope", repo "archwall",
-  workflow "release.yml", allowed action "npm publish").
-
-Then revoke the token used for this run.`);
+  1. For each name above: Settings -> Publishing access -> add a trusted
+     publisher (GitHub Actions, org "peakercope", repo "archwall", workflow
+     "release.yml", allowed action "npm publish").
+  2. Revoke the token used for this run, and set "Require two-factor
+     authentication and disallow tokens" to lock the package to OIDC.
+  3. Re-run the release workflow to publish the rest of the group at ${version}.`);

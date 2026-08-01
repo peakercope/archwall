@@ -45,6 +45,15 @@ const packagesDir = path.join(root, "packages");
 // skip. Requires a build first, same as a real run.
 const dryRun = process.argv.includes("--dry-run");
 
+// `--only=<name,name>` narrows the run to the named packages. bootstrap-publish
+// needs it to claim a brand-new name without touching the rest: a package that
+// has been locked to OIDC on npmjs.com ("require two-factor authentication and
+// disallow tokens") rejects a token-authenticated publish with E403, so a
+// token-run that swept the whole group would die on the first package that is
+// already set up correctly.
+const onlyFlag = process.argv.find((arg) => arg.startsWith("--only="));
+const only = onlyFlag ? new Set(onlyFlag.slice("--only=".length).split(",").filter(Boolean)) : null;
+
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: root, stdio: "pipe", encoding: "utf8" });
 
 // --- Collect the publishable set --------------------------------------------
@@ -55,10 +64,20 @@ for (const dir of readdirSync(packagesDir).sort()) {
   manifests.push({ dir, name: manifest.name, version: manifest.version, manifest });
 }
 
+if (only) {
+  const unknown = [...only].filter((name) => !manifests.some((pkg) => pkg.name === name));
+  if (unknown.length > 0) {
+    console.error(`FAILED: --only names no publishable package: ${unknown.join(", ")}`);
+    process.exit(1);
+  }
+}
+
+const selected = only ? manifests.filter((pkg) => only.has(pkg.name)) : manifests;
+
 // Publish dependencies before their dependents. Nothing forces this - npm
 // accepts them in any order - but it keeps the registry from briefly holding a
 // package whose own dependency does not exist at the version it asks for.
-const names = new Set(manifests.map((p) => p.name));
+const names = new Set(selected.map((p) => p.name));
 const ordered = [];
 const seen = new Set();
 
@@ -70,7 +89,7 @@ const visit = (pkg, stack = []) => {
   for (const dep of Object.keys(pkg.manifest.dependencies ?? {})) {
     if (names.has(dep))
       visit(
-        manifests.find((p) => p.name === dep),
+        selected.find((p) => p.name === dep),
         [...stack, pkg.name],
       );
   }
@@ -78,7 +97,7 @@ const visit = (pkg, stack = []) => {
   ordered.push(pkg);
 };
 
-for (const pkg of manifests) visit(pkg);
+for (const pkg of selected) visit(pkg);
 
 // --- Skip whatever the registry already has ---------------------------------
 // `npm view` exits non-zero both for "this version does not exist" and for
@@ -109,40 +128,61 @@ if (pending.length === 0) {
 // --- Pack with Yarn, upload with npm ----------------------------------------
 const tarballDir = mkdtempSync(path.join(tmpdir(), "archwall-publish-"));
 
+// One package failing does not stop the others. Stopping at the first error
+// sounds safer and is not: 0.2.1 aborted on @archwall/test-utils, whose name
+// was not yet on the registry, and took @archwall/vite and @archwall/webpack
+// down with it - two packages with nothing wrong, left a version behind for a
+// reason that had nothing to do with them. Dependencies are still attempted
+// before their dependents, so anything that can go out does, and the run still
+// exits non-zero with every failure named at the end.
+const failures = [];
+
 try {
   for (const pkg of pending) {
-    const tarball = path.join(tarballDir, `${pkg.dir}.tgz`);
-    run("yarn", ["workspace", pkg.name, "pack", "--out", tarball]);
+    try {
+      const tarball = path.join(tarballDir, `${pkg.dir}.tgz`);
+      run("yarn", ["workspace", pkg.name, "pack", "--out", tarball]);
 
-    // --access is passed explicitly rather than left to publishConfig.access:
-    // scoped packages default to `restricted`, and a first publish that lands
-    // as restricted cannot be undone without unpublishing the name.
-    const output = run("npm", [
-      "publish",
-      tarball,
-      "--access",
-      "public",
-      ...(dryRun ? ["--dry-run"] : []),
-    ]);
-    console.log(output.trim());
+      // --access is passed explicitly rather than left to publishConfig.access:
+      // scoped packages default to `restricted`, and a first publish that lands
+      // as restricted cannot be undone without unpublishing the name.
+      const output = run("npm", [
+        "publish",
+        tarball,
+        "--access",
+        "public",
+        ...(dryRun ? ["--dry-run"] : []),
+      ]);
+      console.log(output.trim());
 
-    // changesets/action greps stdout for this exact line to decide that a
-    // release happened and to push the tags `changeset tag` writes afterwards.
-    // Withheld on a dry run so nothing downstream mistakes it for one.
-    if (!dryRun) console.log(`New tag: ${pkg.name}@${pkg.version}`);
+      // changesets/action greps stdout for this exact line to decide that a
+      // release happened and to push the tags `changeset tag` writes afterwards.
+      // Withheld on a dry run so nothing downstream mistakes it for one.
+      if (!dryRun) console.log(`New tag: ${pkg.name}@${pkg.version}`);
+    } catch (error) {
+      const detail = [
+        error.stdout?.toString().trim(),
+        error.stderr?.toString().trim(),
+        error.message,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      console.error(`\nFAILED ${pkg.name}@${pkg.version}:\n${detail}\n`);
+      failures.push(pkg);
+    }
   }
-} catch (error) {
-  const detail = [error.stdout?.toString().trim(), error.stderr?.toString().trim(), error.message]
-    .filter(Boolean)
-    .join("\n");
-  console.error(`\nFAILED: ${detail}`);
-  process.exit(1);
 } finally {
   rmSync(tarballDir, { recursive: true, force: true });
 }
 
+const succeeded = pending.length - failures.length;
 console.log(
   dryRun
-    ? `\nDry run: ${pending.length} package(s) would be published.`
-    : `\nPublished ${pending.length} package(s).`,
+    ? `\nDry run: ${succeeded} package(s) would be published.`
+    : `\nPublished ${succeeded} of ${pending.length} package(s).`,
 );
+
+if (failures.length > 0) {
+  console.error(`Failed: ${failures.map((pkg) => `${pkg.name}@${pkg.version}`).join(", ")}`);
+  process.exit(1);
+}
